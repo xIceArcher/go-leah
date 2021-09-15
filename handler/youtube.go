@@ -144,6 +144,8 @@ func YoutubeLiveStream(ctx context.Context, cfg *config.Config, session *discord
 		})
 	}
 
-	_, err = session.ChannelMessageSendEmbeds(msg.ChannelID, embeds)
+	if len(embeds) > 0 {
+		_, err = session.ChannelMessageSendEmbeds(msg.ChannelID, embeds)
+	}
 	return err
 }
