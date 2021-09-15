@@ -37,7 +37,7 @@ func YoutubeLiveStream(ctx context.Context, cfg *config.Config, session *discord
 			continue
 		}
 
-		if videoInfo.LiveStreamingDetails == nil {
+		if videoInfo.Snippet.LiveBroadcastContent == youtube.LiveBroadcastContentNone {
 			logger.Info("Not a livestream")
 			continue
 		}

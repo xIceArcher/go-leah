@@ -15,6 +15,8 @@ const (
 	PartLiveStreamingDetails = "liveStreamingDetails"
 	PartContentDetails       = "contentDetails"
 	PartSnippet              = "snippet"
+
+	LiveBroadcastContentNone = "none"
 )
 
 type API struct{}
