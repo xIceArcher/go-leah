@@ -1,0 +1,49 @@
+twitter:
+  consumerKey:
+  consumerSecret:
+  accessToken:
+  accessSecret:
+
+google:
+  apiKey:
+
+instagram:
+  postUrlFormat: http://instagram.com/p/%s
+
+discord:
+  token:
+  prefix: "!!"
+  adminID:
+  commands:
+    admin:
+      isAdminOnly: true
+    restart:
+      isAdminOnly: true
+    embed:
+    photos:
+    video:
+    quoted:
+  handlers:
+    youtubeLiveStream:
+      regexes:
+        - '(?:http[s]?://)(?:w{3}\.)?youtube\.com/watch\?v=([A-Za-z0-9_\-]+)'
+        - '(?:http[s]?://)?(?:w{3}\.)?youtu\.be/([A-Za-z0-9_\-]+)'
+    instagramPost:
+      regexes:
+        - 'http[s]?://(?:w{3}\.)?instagram\.com/p/([A-Za-z0-9\-_]*)/?(?:\?[^ \r\n]*)?'
+        - 'http[s]?://(?:w{3}\.)?instagram\.com/reel/([A-Za-z0-9\-_]*)/?(?:\?[^ \r\n]*)?'
+  filterRegexes:
+    - '<.*>'                                # Surpressed
+    - '\|\|[^\|]+\|\|'                      # Spoilers
+    - '@(everyone|here|[!&]?[0-9]{17,21})'  # Mentions
+  expandIgnoreRegexes:
+    # Don't ever display these URLs, stop redirecting and use the previous useful link instead
+    - 'http[s]?://(?:w{3}\.)?instagram\.com/accounts/login'
+
+logger:
+  level: info
+  encoding: console
+  outputPaths:
+    - stdout
+  errOutputPaths:
+    - stderr
