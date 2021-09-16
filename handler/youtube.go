@@ -106,7 +106,7 @@ func YoutubeLiveStream(ctx context.Context, cfg *config.Config, session *discord
 		}
 
 		duration, ok := utils.ParseISODuration(videoInfo.ContentDetails.Duration)
-		if ok {
+		if ok && duration > time.Duration(0) {
 			fields = append(fields, &discordgo.MessageEmbedField{
 				Name:   "Duration",
 				Value:  utils.FormatDurationSimple(duration),
