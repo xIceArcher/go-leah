@@ -11,6 +11,7 @@ type Config struct {
 	Twitter   *TwitterConfig `yaml:"twitter"`
 	Google    *GoogleConfig  `yaml:"google"`
 	Instagram *InstaConfig   `yaml:"instagram"`
+	Twitch    *TwitchConfig  `yaml:"twitch"`
 
 	Discord *DiscordConfig `yaml:"discord"`
 
@@ -32,6 +33,11 @@ type GoogleConfig struct {
 
 type InstaConfig struct {
 	PostURLFormat string `yaml:"postUrlFormat"`
+}
+
+type TwitchConfig struct {
+	ClientID     string `yaml:"clientID"`
+	ClientSecret string `yaml:"clientSecret"`
 }
 
 type DiscordConfig struct {

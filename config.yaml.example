@@ -10,6 +10,10 @@ google:
 instagram:
   postUrlFormat: http://instagram.com/p/%s
 
+twitch:
+  clientID:
+  clientSecret:
+
 discord:
   token:
   prefix: "!!"
@@ -32,6 +36,9 @@ discord:
       regexes:
         - 'http[s]?://(?:w{3}\.)?instagram\.com/p/([A-Za-z0-9\-_]*)/?(?:\?[^ \r\n]*)?'
         - 'http[s]?://(?:w{3}\.)?instagram\.com/reel/([A-Za-z0-9\-_]*)/?(?:\?[^ \r\n]*)?'
+    twitchLiveStream:
+      regexes:
+        - http[s]?://(?:w{3}\.)?twitch.tv/([A-Za-z0-9_]*)
   filterRegexes:
     - '<.*>'                                # Surpressed
     - '\|\|[^\|]+\|\|'                      # Spoilers

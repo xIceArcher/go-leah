@@ -24,6 +24,7 @@ func (handler DiscordBotMessageHandlerFunc) GetHandlerName() string {
 var implementedHandlers []DiscordBotMessageHandlerFunc = []DiscordBotMessageHandlerFunc{
 	YoutubeLiveStream,
 	InstagramPost,
+	TwitchLiveStream,
 }
 
 type DiscordBotMessageHandler struct {
