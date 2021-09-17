@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/relvacode/iso8601"
@@ -36,28 +35,8 @@ func ParseISODuration(s string) (time.Duration, bool) {
 	return p.DurationApprox(), true
 }
 
-func FormatDuration(d time.Duration) (s string) {
-	totalSeconds := int(d.Seconds())
-
-	seconds, totalMinutes := totalSeconds%60, totalSeconds/60
-	minutes, totalHours := totalMinutes%60, totalMinutes/60
-	hours, days := totalHours%24, totalHours/24
-
-	components := make([]string, 0)
-	if days > 0 {
-		components = append(components, fmt.Sprintf("%vd", days))
-	}
-	if hours > 0 {
-		components = append(components, fmt.Sprintf("%vh", hours))
-	}
-	if minutes > 0 {
-		components = append(components, fmt.Sprintf("%vm", minutes))
-	}
-	if seconds > 0 {
-		components = append(components, fmt.Sprintf("%vs", seconds))
-	}
-
-	return strings.Join(components, " ")
+func FormatDiscordRelativeTime(t time.Time) (s string) {
+	return fmt.Sprintf("<t:%v:R>", t.Unix())
 }
 
 func FormatDurationSimple(d time.Duration) string {

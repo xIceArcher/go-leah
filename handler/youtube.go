@@ -86,7 +86,7 @@ func YoutubeLiveStream(ctx context.Context, cfg *config.Config, session *discord
 		if time.Now().After(startTime) {
 			fields = append(fields, &discordgo.MessageEmbedField{
 				Name:   "Started",
-				Value:  fmt.Sprintf("%s ago", utils.FormatDuration(time.Since(startTime))),
+				Value:  utils.FormatDiscordRelativeTime(startTime),
 				Inline: true,
 			})
 
@@ -99,8 +99,8 @@ func YoutubeLiveStream(ctx context.Context, cfg *config.Config, session *discord
 			}
 		} else {
 			fields = append(fields, &discordgo.MessageEmbedField{
-				Name:   "Starts in",
-				Value:  utils.FormatDuration(time.Until(startTime)),
+				Name:   "Starts",
+				Value:  utils.FormatDiscordRelativeTime(startTime),
 				Inline: true,
 			})
 		}
