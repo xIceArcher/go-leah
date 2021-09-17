@@ -170,13 +170,22 @@ func (a *API) getVideoURL(tweet *twitter.Tweet) (videoURL string) {
 		return
 	}
 
-	for _, media := range tweet.ExtendedEntities.Media {
-		if media.Type == MediaTypeVideo {
-			return media.MediaURL
+	medias := tweet.ExtendedEntities.Media
+	if len(medias) == 0 {
+		return ""
+	}
+
+	maxBitrate := 0
+	maxUrl := ""
+
+	for _, video := range medias[0].VideoInfo.Variants {
+		if video.ContentType == "video/mp4" && video.Bitrate > maxBitrate {
+			maxBitrate = video.Bitrate
+			maxUrl = video.URL
 		}
 	}
 
-	return ""
+	return maxUrl
 }
 
 func (a *API) GetUser(id string) (*User, error) {
