@@ -40,8 +40,17 @@ func Embed(ctx context.Context, cfg *config.Config, session *discordgo.Session, 
 		return err
 	}
 
-	_, err = session.ChannelMessageSendEmbeds(msg.ChannelID, tweet.GetEmbeds(cfg.Discord))
-	return err
+	if _, err = session.ChannelMessageSendEmbeds(msg.ChannelID, tweet.GetEmbeds(cfg.Discord)); err != nil {
+		return err
+	}
+
+	if tweet.HasVideo {
+		if _, err = session.ChannelMessageSend(msg.ChannelID, tweet.VideoURL); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func Photos(ctx context.Context, cfg *config.Config, session *discordgo.Session, msg *discordgo.Message, args []string) (err error) {
