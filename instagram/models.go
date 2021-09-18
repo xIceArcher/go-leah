@@ -74,7 +74,7 @@ func (p *RawPost) extractVideoURLs() []string {
 			continue
 		}
 
-		videoURLs = append(videoURLs, edge.Node.DisplayURL)
+		videoURLs = append(videoURLs, edge.Node.VideoURL)
 	}
 
 	if len(videoURLs) == 0 && p.IsVideo {

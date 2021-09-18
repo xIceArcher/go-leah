@@ -222,6 +222,7 @@ func (b *DiscordBot) handleMessage(ctx context.Context, s *discordgo.Session, m 
 
 			if err := handler.HandlerFunc(ctx, b.Cfg, s, m.Message, matches); err != nil {
 				messageLogger.With(zap.Error(err)).Error("Handle message")
+				continue
 			}
 
 			messageLogger.Info("Success")
