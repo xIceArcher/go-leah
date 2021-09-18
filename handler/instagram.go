@@ -87,16 +87,18 @@ func InstagramPost(ctx context.Context, cfg *config.Config, session *discordgo.S
 		embeds[len(embeds)-1].Timestamp = post.Timestamp.Format(time.RFC3339)
 
 		if len(embeds) > 10 {
-			zap.S().Warn("More than 10 embeds in one message")
+			logger.Warn("More than 10 embeds in one message")
 		}
+
+		videoMessages := utils.SplitVideos(post.VideoURLs, shortcode)
 
 		if _, err = session.ChannelMessageSendEmbeds(msg.ChannelID, embeds); err != nil {
 			logger.With(zap.Error(err)).Error("Send post embeds")
 			continue
 		}
 
-		for _, videoURL := range post.VideoURLs {
-			if _, err = session.ChannelMessageSend(msg.ChannelID, videoURL); err != nil {
+		for _, message := range videoMessages {
+			if _, err = session.ChannelMessageSendComplex(msg.ChannelID, message); err != nil {
 				logger.With(zap.Error(err)).Error("Send post videos")
 				continue
 			}

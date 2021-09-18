@@ -9,3 +9,7 @@ const (
 	ColorTwitter = "1DA1F2"
 	ColorTwitch  = "6441A4"
 )
+
+const (
+	DiscordMessageMaxBytes = 7995000
+)

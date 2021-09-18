@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -27,7 +28,7 @@ func TwitchLiveStream(ctx context.Context, cfg *config.Config, session *discordg
 		)
 
 		streamInfo, err := api.GetStream(loginName)
-		if err == twitch.ErrNotFound {
+		if errors.Is(err, twitch.ErrNotFound) {
 			logger.Info("Stream is not found or not live")
 			return nil
 		}
