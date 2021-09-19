@@ -20,23 +20,26 @@ func SplitVideos(urls []string, fileNamePrefix string) (messages []*discordgo.Me
 
 	for i, url := range urls {
 		file, bytes, err := Download(url, remainingBytes)
-		if (err != nil && err != ErrResponseTooLong) || bytes > maxBytes {
+		if errors.Is(err, ErrResponseTooLong) && bytes < maxBytes {
+			// This video can't fit in the current message, but does not exceed the maximum bytes in a single message
+			// Flush the current files to a message and start a new message
+			// Then redownload the video
+			messages = append(messages, &discordgo.MessageSend{
+				Files: files,
+			})
+			files = make([]*discordgo.File, 0)
+			remainingBytes = maxBytes
+
+			file, bytes, err = Download(url, remainingBytes)
+		}
+
+		if (err != nil && !errors.Is(err, ErrResponseTooLong)) || bytes > maxBytes {
 			// Either we can't fetch the link or this video exceeds the maximum bytes in a single message
 			// So we just send the video URL
 			messages = append(messages, &discordgo.MessageSend{
 				Content: url,
 			})
 			continue
-		}
-
-		if errors.Is(err, ErrResponseTooLong) {
-			// This video can't fit in the current message, but does not exceed the maximum bytes in a single message
-			// Flush the current files to a message and start a new message
-			messages = append(messages, &discordgo.MessageSend{
-				Files: files,
-			})
-			files = make([]*discordgo.File, 0)
-			remainingBytes = maxBytes
 		}
 
 		remainingBytes -= bytes
@@ -47,6 +50,7 @@ func SplitVideos(urls []string, fileNamePrefix string) (messages []*discordgo.Me
 		})
 	}
 
+	// Flush the last message if there are videos in it
 	if len(files) > 0 {
 		messages = append(messages, &discordgo.MessageSend{
 			Files: files,

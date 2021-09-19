@@ -41,7 +41,7 @@ func Download(url string, maxBytes int64) (io.Reader, int64, error) {
 		return nil, 0, err
 	}
 	if resp.ContentLength > maxBytes {
-		return nil, 0, ErrResponseTooLong
+		return nil, resp.ContentLength, ErrResponseTooLong
 	}
 
 	resp, err = downloadClient.Get(url)
