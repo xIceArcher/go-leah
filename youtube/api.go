@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/xIceArcher/go-leah/config"
+	"github.com/xIceArcher/go-leah/utils"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
 )
@@ -35,7 +36,7 @@ func NewAPI(cfg *config.GoogleConfig) (API, error) {
 	return API{}, err
 }
 
-func (API) GetVideoInfo(id string, parts []string) (*youtube.Video, error) {
+func (API) GetVideo(id string, parts []string) (*Video, error) {
 	videosInfo, err := api.Videos.List(parts).Id(id).Do()
 	if err != nil {
 		return nil, err
@@ -45,10 +46,44 @@ func (API) GetVideoInfo(id string, parts []string) (*youtube.Video, error) {
 		return nil, fmt.Errorf("video %s not found", id)
 	}
 
-	return videosInfo.Items[0], nil
+	videoInfo := videosInfo.Items[0]
+	video := &Video{
+		ID:        id,
+		Title:     videoInfo.Snippet.Title,
+		ChannelID: videoInfo.Snippet.ChannelId,
+	}
+
+	video.Channel, err = API{}.GetChannel(video.ChannelID, []string{PartSnippet})
+	if err != nil {
+		return nil, err
+	}
+
+	if duration, ok := utils.ParseISODuration(videoInfo.ContentDetails.Duration); ok {
+		video.Duration = duration
+	}
+
+	if thumbnail, err := getBestThumbnail(videoInfo.Snippet.Thumbnails); err == nil {
+		video.ThumbnailURL = thumbnail.Url
+	}
+
+	if videoInfo.Snippet.LiveBroadcastContent != LiveBroadcastContentNone {
+		video.LiveStreamingDetails = &LiveStreamingDetails{
+			ConcurrentViewers: videoInfo.LiveStreamingDetails.ConcurrentViewers,
+		}
+
+		if actualStartTime, ok := utils.ParseISOTime(videoInfo.LiveStreamingDetails.ActualStartTime); ok {
+			video.LiveStreamingDetails.ActualStartTime = actualStartTime
+		}
+
+		if scheduledStartTime, ok := utils.ParseISOTime(videoInfo.LiveStreamingDetails.ScheduledStartTime); ok {
+			video.LiveStreamingDetails.ScheduledStartTime = scheduledStartTime
+		}
+	}
+
+	return video, nil
 }
 
-func (API) GetChannelInfo(id string, parts []string) (*youtube.Channel, error) {
+func (API) GetChannel(id string, parts []string) (*Channel, error) {
 	channelsInfo, err := api.Channels.List(parts).Id(id).Do()
 	if err != nil {
 		return nil, err
@@ -58,10 +93,20 @@ func (API) GetChannelInfo(id string, parts []string) (*youtube.Channel, error) {
 		return nil, fmt.Errorf("channel %s not found", id)
 	}
 
-	return channelsInfo.Items[0], nil
+	channelInfo := channelsInfo.Items[0]
+	channel := &Channel{
+		ID:    id,
+		Title: channelInfo.Snippet.Title,
+	}
+
+	if thumbnail, err := getBestThumbnail(channelInfo.Snippet.Thumbnails); err == nil {
+		channel.ThumbnailURL = thumbnail.Url
+	}
+
+	return channel, nil
 }
 
-func (API) GetBestThumbnail(details *youtube.ThumbnailDetails) (*youtube.Thumbnail, error) {
+func getBestThumbnail(details *youtube.ThumbnailDetails) (*youtube.Thumbnail, error) {
 	thumbnails := []*youtube.Thumbnail{
 		details.Default, details.High, details.Maxres, details.Medium, details.Standard,
 	}
@@ -85,12 +130,4 @@ func (API) GetBestThumbnail(details *youtube.ThumbnailDetails) (*youtube.Thumbna
 	}
 
 	return thumbnails[currMaxIdx], nil
-}
-
-func (API) GetVideoURL(id string) string {
-	return fmt.Sprintf("https://www.youtube.com/watch?v=%s", id)
-}
-
-func (API) GetChannelURL(id string) string {
-	return fmt.Sprintf("https://www.youtube.com/channel/%s", id)
 }
