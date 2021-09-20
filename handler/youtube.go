@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"regexp"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
@@ -10,12 +11,24 @@ import (
 	"go.uber.org/zap"
 )
 
-func YoutubeLiveStream(ctx context.Context, cfg *config.Config, session *discordgo.Session, msg *discordgo.Message, videoIDs []string) (err error) {
-	api, err := youtube.NewAPI(cfg.Google)
-	if err != nil {
-		return err
-	}
+type YoutubeLiveStreamHandler struct {
+	api *youtube.API
 
+	RegexManager
+}
+
+func (YoutubeLiveStreamHandler) Name() string {
+	return "youtubeLiveStream"
+}
+
+func (h *YoutubeLiveStreamHandler) Setup(ctx context.Context, cfg *config.Config, regexes []*regexp.Regexp) (err error) {
+	h.Regexes = regexes
+	h.api, err = youtube.NewAPI(cfg.Google)
+	return err
+}
+
+func (h *YoutubeLiveStreamHandler) Handle(ctx context.Context, cfg *config.Config, session *discordgo.Session, channelID string, msg string) (videoIDs []string, err error) {
+	videoIDs = h.Match(msg)
 	embeds := make([]*discordgo.MessageEmbed, 0, len(videoIDs))
 
 	for _, videoID := range videoIDs {
@@ -28,7 +41,7 @@ func YoutubeLiveStream(ctx context.Context, cfg *config.Config, session *discord
 			"videoID", videoID,
 		)
 
-		video, err := api.GetVideo(videoID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
+		video, err := h.api.GetVideo(videoID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
 		if err != nil {
 			logger.With(zap.Error(err)).Error("Get video info")
 			continue
@@ -47,7 +60,7 @@ func YoutubeLiveStream(ctx context.Context, cfg *config.Config, session *discord
 	}
 
 	if len(embeds) > 0 {
-		_, err = session.ChannelMessageSendEmbeds(msg.ChannelID, embeds)
+		_, err = session.ChannelMessageSendEmbeds(channelID, embeds)
 	}
-	return err
+	return videoIDs, err
 }

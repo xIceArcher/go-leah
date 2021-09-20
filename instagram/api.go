@@ -20,7 +20,7 @@ var (
 	apiSetupOnce   sync.Once
 )
 
-func NewAPI(cfg *config.InstaConfig) (API, error) {
+func NewAPI(cfg *config.InstaConfig) (*API, error) {
 	apiSetupOnce.Do(func() {
 		instaURLFormat = cfg.PostURLFormat
 		client = &http.Client{
@@ -28,7 +28,7 @@ func NewAPI(cfg *config.InstaConfig) (API, error) {
 		}
 	})
 
-	return API{}, nil
+	return &API{}, nil
 }
 
 func (API) GetPost(shortcode string) (*Post, error) {

@@ -27,13 +27,13 @@ var (
 	apiSetupOnce sync.Once
 )
 
-func NewAPI(cfg *config.GoogleConfig) (API, error) {
+func NewAPI(cfg *config.GoogleConfig) (*API, error) {
 	var err error
 	apiSetupOnce.Do(func() {
 		api, err = youtube.NewService(context.Background(), option.WithAPIKey(cfg.APIKey))
 	})
 
-	return API{}, err
+	return &API{}, err
 }
 
 func (API) GetVideo(id string, parts []string) (*Video, error) {

@@ -14,7 +14,6 @@ import (
 	"github.com/xIceArcher/go-leah/command"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/handler"
-	"github.com/xIceArcher/go-leah/utils"
 )
 
 type DiscordBot struct {
@@ -24,7 +23,7 @@ type DiscordBot struct {
 
 	session       *discordgo.Session
 	commands      []*command.DiscordBotCommand
-	handlers      []*handler.DiscordBotMessageHandler
+	handlers      []handler.MessageHandler
 	filterRegexes []*regexp.Regexp
 }
 
@@ -34,7 +33,7 @@ const (
 
 func New(
 	cfg *config.Config,
-	commands []*command.DiscordBotCommand, handlers []*handler.DiscordBotMessageHandler,
+	commands []*command.DiscordBotCommand, handlers []handler.MessageHandler,
 	intents discordgo.Intent,
 ) (bot *DiscordBot, err error) {
 	existingCommands := make(map[string]struct{})
@@ -82,6 +81,7 @@ func (b *DiscordBot) Run(ctx context.Context) error {
 			"guild", m.GuildID,
 			"channel", m.ChannelID,
 			"user", m.Author.Username,
+			"messageID", m.ID,
 		)
 
 		// Ignore messages by self
@@ -193,39 +193,24 @@ func (b *DiscordBot) handleMessage(ctx context.Context, s *discordgo.Session, m 
 			msg = regex.ReplaceAllLiteralString(msg, "")
 		}
 
-		matches := make([]string, 0)
-		for _, regex := range handler.Regexs {
-			currMatches := regex.FindAllStringSubmatch(msg, -1)
-			for _, match := range currMatches {
-				if len(match) > 1 {
-					// match[1] is the subgroup
-					matches = append(matches, match[1])
-				} else {
-					// match[0] is the complete match
-					matches = append(matches, match[0])
-				}
+		messageLogger := logger.With(
+			"handler", handler.Name(),
+		)
+
+		defer func() {
+			if r := recover(); r != nil {
+				messageLogger.With("panic", r).Error("Handler panicked")
 			}
+		}()
+
+		matches, err := handler.Handle(ctx, b.Cfg, s, m.ChannelID, msg)
+		if err != nil {
+			messageLogger.With("matches", matches).With(zap.Error(err)).Error("Handle message")
+			continue
 		}
 
-		matches = utils.Unique(matches)
 		if len(matches) > 0 {
-			messageLogger := logger.With(
-				"handler", handler.Name,
-				"matches", matches,
-			)
-
-			defer func() {
-				if r := recover(); r != nil {
-					messageLogger.With("panic", r).Error("Handler panicked")
-				}
-			}()
-
-			if err := handler.HandlerFunc(ctx, b.Cfg, s, m.Message, matches); err != nil {
-				messageLogger.With(zap.Error(err)).Error("Handle message")
-				continue
-			}
-
-			messageLogger.Info("Success")
+			messageLogger.With("matches", matches).Info("Success")
 		}
 	}
 }

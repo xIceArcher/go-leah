@@ -20,7 +20,7 @@ var (
 
 var ErrNotFound = errors.New("resource not found")
 
-func NewAPI(cfg *config.TwitchConfig) (API, error) {
+func NewAPI(cfg *config.TwitchConfig) (*API, error) {
 	var err error
 	apiSetupOnce.Do(func() {
 		if api, err = helix.NewClient(&helix.Options{
@@ -39,7 +39,7 @@ func NewAPI(cfg *config.TwitchConfig) (API, error) {
 		api.SetAppAccessToken(resp.Data.AccessToken)
 	})
 
-	return API{}, err
+	return &API{}, err
 }
 
 func (API) GetStream(loginName string) (*helix.Stream, error) {

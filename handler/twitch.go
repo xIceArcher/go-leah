@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -14,12 +15,24 @@ import (
 	"go.uber.org/zap"
 )
 
-func TwitchLiveStream(ctx context.Context, cfg *config.Config, session *discordgo.Session, msg *discordgo.Message, loginNames []string) (err error) {
-	api, err := twitch.NewAPI(cfg.Twitch)
-	if err != nil {
-		return nil
-	}
+type TwitchLiveStreamHandler struct {
+	api *twitch.API
 
+	RegexManager
+}
+
+func (TwitchLiveStreamHandler) Name() string {
+	return "twitchLiveStream"
+}
+
+func (h *TwitchLiveStreamHandler) Setup(ctx context.Context, cfg *config.Config, regexes []*regexp.Regexp) (err error) {
+	h.Regexes = regexes
+	h.api, err = twitch.NewAPI(cfg.Twitch)
+	return err
+}
+
+func (h *TwitchLiveStreamHandler) Handle(ctx context.Context, cfg *config.Config, session *discordgo.Session, channelID string, msg string) (loginNames []string, err error) {
+	loginNames = h.Match(msg)
 	embeds := make([]*discordgo.MessageEmbed, 0, len(loginNames))
 
 	for _, loginName := range loginNames {
@@ -27,16 +40,16 @@ func TwitchLiveStream(ctx context.Context, cfg *config.Config, session *discordg
 			"loginName", loginName,
 		)
 
-		streamInfo, err := api.GetStream(loginName)
+		streamInfo, err := h.api.GetStream(loginName)
 		if errors.Is(err, twitch.ErrNotFound) {
 			logger.Info("Stream is not found or not live")
-			return nil
+			return loginNames, nil
 		}
 		if err != nil {
-			return err
+			return loginNames, err
 		}
 
-		user, err := api.GetUser(loginName)
+		user, err := h.api.GetUser(loginName)
 		var profileImageURL string
 		if err == nil {
 			profileImageURL = user.ProfileImageURL
@@ -55,14 +68,14 @@ func TwitchLiveStream(ctx context.Context, cfg *config.Config, session *discordg
 		})
 
 		embeds = append(embeds, &discordgo.MessageEmbed{
-			URL:   api.GetUserURL(loginName),
+			URL:   h.api.GetUserURL(loginName),
 			Title: streamInfo.Title,
 			Thumbnail: &discordgo.MessageEmbedThumbnail{
-				URL: api.FormatThumbnailURL(streamInfo.ThumbnailURL, 1920, 1080),
+				URL: h.api.FormatThumbnailURL(streamInfo.ThumbnailURL, 1920, 1080),
 			},
 			Author: &discordgo.MessageEmbedAuthor{
 				Name:    streamInfo.UserName,
-				URL:     api.GetUserURL(loginName),
+				URL:     h.api.GetUserURL(loginName),
 				IconURL: profileImageURL,
 			},
 			Timestamp: streamInfo.StartedAt.Format(time.RFC3339),
@@ -76,7 +89,7 @@ func TwitchLiveStream(ctx context.Context, cfg *config.Config, session *discordg
 	}
 
 	if len(embeds) > 0 {
-		_, err = session.ChannelMessageSendEmbeds(msg.ChannelID, embeds)
+		_, err = session.ChannelMessageSendEmbeds(channelID, embeds)
 	}
-	return err
+	return loginNames, err
 }

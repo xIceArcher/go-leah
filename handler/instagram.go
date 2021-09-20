@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -13,18 +14,31 @@ import (
 	"go.uber.org/zap"
 )
 
-func InstagramPost(ctx context.Context, cfg *config.Config, session *discordgo.Session, msg *discordgo.Message, shortcodes []string) (err error) {
-	api, err := instagram.NewAPI(cfg.Instagram)
-	if err != nil {
-		return err
-	}
+type InstagramPostHandler struct {
+	api *instagram.API
+
+	RegexManager
+}
+
+func (InstagramPostHandler) Name() string {
+	return "instagramPost"
+}
+
+func (h *InstagramPostHandler) Setup(ctx context.Context, cfg *config.Config, regexes []*regexp.Regexp) (err error) {
+	h.Regexes = regexes
+	h.api, err = instagram.NewAPI(cfg.Instagram)
+	return err
+}
+
+func (h *InstagramPostHandler) Handle(ctx context.Context, cfg *config.Config, session *discordgo.Session, channelID string, msg string) (shortcodes []string, err error) {
+	shortcodes = h.Match(msg)
 
 	for _, shortcode := range shortcodes {
 		logger := zap.S().With(
 			zap.String("shortcode", shortcode),
 		)
 
-		post, err := api.GetPost(shortcode)
+		post, err := h.api.GetPost(shortcode)
 		if err != nil {
 			logger.With(zap.Error(err)).Error("Get post")
 			continue
@@ -32,10 +46,10 @@ func InstagramPost(ctx context.Context, cfg *config.Config, session *discordgo.S
 
 		textWithEntities := &utils.TextWithEntities{Text: post.Text}
 		textWithEntities.AddByRegex(instagram.MentionRegex, func(s string) string {
-			return utils.GetDiscordNamedLink(s, api.GetMentionURL(s))
+			return utils.GetDiscordNamedLink(s, h.api.GetMentionURL(s))
 		})
 		textWithEntities.AddByRegex(instagram.HashtagRegex, func(s string) string {
-			return utils.GetDiscordNamedLink(s, api.GetHashtagURL(s))
+			return utils.GetDiscordNamedLink(s, h.api.GetHashtagURL(s))
 		})
 
 		segmentedText := textWithEntities.GetReplacedText(4096, -1)
@@ -92,18 +106,18 @@ func InstagramPost(ctx context.Context, cfg *config.Config, session *discordgo.S
 
 		videoMessages := utils.SplitVideos(post.VideoURLs, shortcode)
 
-		if _, err = session.ChannelMessageSendEmbeds(msg.ChannelID, embeds); err != nil {
+		if _, err = session.ChannelMessageSendEmbeds(channelID, embeds); err != nil {
 			logger.With(zap.Error(err)).Error("Send post embeds")
 			continue
 		}
 
 		for _, message := range videoMessages {
-			if _, err = session.ChannelMessageSendComplex(msg.ChannelID, message); err != nil {
+			if _, err = session.ChannelMessageSendComplex(channelID, message); err != nil {
 				logger.With(zap.Error(err)).Error("Send post videos")
 				continue
 			}
 		}
 	}
 
-	return nil
+	return shortcodes, nil
 }

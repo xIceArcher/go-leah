@@ -3,68 +3,78 @@ package handler
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"regexp"
-	"runtime"
-	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
+	"github.com/xIceArcher/go-leah/utils"
 )
 
-type DiscordBotMessageHandlerFunc func(ctx context.Context, cfg *config.Config, session *discordgo.Session, msg *discordgo.Message, matches []string) error
-
-func (handler DiscordBotMessageHandlerFunc) GetHandlerName() string {
-	fullName := runtime.FuncForPC(reflect.ValueOf(handler).Pointer()).Name()
-	tokenizedName := strings.Split(fullName, ".")
-	funcName := tokenizedName[len(tokenizedName)-1]
-	return strings.ToLower(funcName[0:1]) + funcName[1:]
+type MessageHandler interface {
+	Name() string
+	Setup(ctx context.Context, cfg *config.Config, regexp []*regexp.Regexp) error
+	Handle(ctx context.Context, cfg *config.Config, session *discordgo.Session, channelID string, msg string) ([]string, error)
 }
 
-var implementedHandlers []DiscordBotMessageHandlerFunc = []DiscordBotMessageHandlerFunc{
-	YoutubeLiveStream,
-	InstagramPost,
-	TwitchLiveStream,
+var implementedHandlers []MessageHandler = []MessageHandler{
+	&YoutubeLiveStreamHandler{},
+	&InstagramPostHandler{},
+	&TwitchLiveStreamHandler{},
 }
 
-type DiscordBotMessageHandler struct {
-	Name        string
-	Regexs      []*regexp.Regexp
-	HandlerFunc DiscordBotMessageHandlerFunc
-}
-
-func GetHandlers(toLoad map[string]*config.DiscordHandlerConfig) (handlers []*DiscordBotMessageHandler, err error) {
-	availableHandlers := make(map[string]DiscordBotMessageHandlerFunc)
+func SetupHandlers(ctx context.Context, cfg *config.Config) (handlers []MessageHandler, err error) {
+	availableHandlers := make(map[string]MessageHandler)
 	for _, handler := range implementedHandlers {
-		availableHandlers[handler.GetHandlerName()] = handler
+		availableHandlers[handler.Name()] = handler
 	}
 
-	for name, cfg := range toLoad {
+	for name, handlerCfg := range cfg.Discord.Handlers {
 		handler, ok := availableHandlers[name]
 		if !ok {
 			return nil, fmt.Errorf("handler %s not found", name)
 		}
 
-		if len(cfg.Regexes) == 0 {
+		if len(handlerCfg.Regexes) == 0 {
 			return nil, fmt.Errorf("handler %s has no regexes", name)
 		}
 
-		regexes := make([]*regexp.Regexp, 0, len(cfg.Regexes))
-		for _, regexStr := range cfg.Regexes {
+		regexes := make([]*regexp.Regexp, 0, len(handlerCfg.Regexes))
+		for _, regexStr := range handlerCfg.Regexes {
 			regex, err := regexp.Compile(regexStr)
 			if err != nil {
-				return nil, fmt.Errorf("regex %s is invalid", regexStr)
+				return nil, fmt.Errorf("regex %s in handler %s is invalid", regexStr, name)
 			}
 
 			regexes = append(regexes, regex)
 		}
 
-		handlers = append(handlers, &DiscordBotMessageHandler{
-			Name:        name,
-			Regexs:      regexes,
-			HandlerFunc: handler,
-		})
+		if err := handler.Setup(ctx, cfg, regexes); err != nil {
+			return nil, err
+		}
+
+		handlers = append(handlers, handler)
 	}
 
 	return handlers, nil
+}
+
+type RegexManager struct {
+	Regexes []*regexp.Regexp
+}
+
+func (r *RegexManager) Match(s string) (matches []string) {
+	for _, regex := range r.Regexes {
+		currMatches := regex.FindAllStringSubmatch(s, -1)
+		for _, match := range currMatches {
+			if len(match) > 1 {
+				// match[1] is the subgroup
+				matches = append(matches, match[1])
+			} else {
+				// match[0] is the complete match
+				matches = append(matches, match[0])
+			}
+		}
+	}
+
+	return utils.Unique(matches)
 }

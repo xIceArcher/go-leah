@@ -34,12 +34,15 @@ func main() {
 	logger := zap.S()
 	defer logger.Sync()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	commands, err := command.GetCommands(cfg.Discord.Commands)
 	if err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to load commands")
 	}
 
-	messageHandlers, err := handler.GetHandlers(cfg.Discord.Handlers)
+	messageHandlers, err := handler.SetupHandlers(ctx, cfg)
 	if err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to load handlers")
 	}
@@ -48,11 +51,6 @@ func main() {
 	if err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to initialize bot")
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-	}()
 
 	if err := bot.Run(ctx); err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to start bot")
