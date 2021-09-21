@@ -175,7 +175,7 @@ func (a *API) getVideoURL(tweet *twitter.Tweet) (videoURL string) {
 		return ""
 	}
 
-	maxBitrate := 0
+	maxBitrate := -1
 	maxUrl := ""
 
 	for _, video := range medias[0].VideoInfo.Variants {
