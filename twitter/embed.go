@@ -164,5 +164,10 @@ func (t *Tweet) GetTextWithEmbeds(cfg *config.DiscordConfig) string {
 		return finalURL
 	}, t.URLs...)
 
-	return strings.TrimSpace(textWithEntities.GetReplacedText(4096, -1)[0])
+	replacedText := textWithEntities.GetReplacedText(4096, -1)
+	if len(replacedText) == 0 {
+		return ""
+	}
+
+	return strings.TrimSpace(replacedText[0])
 }
