@@ -58,8 +58,10 @@ func (API) GetPost(shortcode string) (*Post, error) {
 	}
 
 	rawPost := postPage[0].GraphQL.ShortcodeMedia
-	if len(rawPost.EdgesMediaToCaption.Edges) == 0 {
-		return nil, errors.New("failed to get post text")
+
+	var text string
+	if len(rawPost.EdgesMediaToCaption.Edges) != 0 {
+		text = rawPost.EdgesMediaToCaption.Edges[0].Node.Text
 	}
 
 	return &Post{
@@ -70,7 +72,7 @@ func (API) GetPost(shortcode string) (*Post, error) {
 			ProfilePicURL: rawPost.Owner.ProfilePicURL,
 		},
 
-		Text:      rawPost.EdgesMediaToCaption.Edges[0].Node.Text,
+		Text:      text,
 		Likes:     rawPost.EdgeMediaPreviewLike.Count,
 		Timestamp: time.Unix(rawPost.TakenAtTimestamp, 0),
 

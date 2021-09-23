@@ -74,6 +74,11 @@ func (t *TextWithEntities) GetReplacedText(maxBytes int, n int) (ret []string) {
 	if currStr != "" {
 		ret = append(ret, currStr)
 	}
+
+	if len(ret) == 0 {
+		return []string{""}
+	}
+
 	return
 }
 
