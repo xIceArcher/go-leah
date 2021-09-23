@@ -24,7 +24,8 @@ type TwitterConfig struct {
 	AccessToken    string `yaml:"accessToken"`
 	AccessSecret   string `yaml:"accessSecret"`
 
-	MaxStreamRestartRetries int `yaml:"maxStreamRestartRetries" default:"5"`
+	MaxStreamRestartRetries int      `yaml:"maxStreamRestartRetries" default:"5"`
+	ExpandIgnoreRegexes     []string `yaml:"expandIgnoreRegexes"`
 }
 
 type GoogleConfig struct {
@@ -48,8 +49,7 @@ type DiscordConfig struct {
 	Commands map[string]*DiscordCommandConfig `yaml:"commands"`
 	Handlers map[string]*DiscordHandlerConfig `yaml:"handlers"`
 
-	FilterRegexes       []string `yaml:"filterRegexes"`
-	ExpandIgnoreRegexes []string `yaml:"expandIgnoreRegexes"`
+	FilterRegexes []string `yaml:"filterRegexes"`
 }
 
 type DiscordCommandConfig struct {

@@ -4,6 +4,10 @@ twitter:
   accessToken:
   accessSecret:
 
+  expandIgnoreRegexes:
+    # Don't ever display these URLs, stop redirecting and use the previous useful link instead
+    - 'http[s]?://(?:w{3}\.)?instagram\.com/accounts/login'
+
 google:
   apiKey:
 
@@ -43,9 +47,6 @@ discord:
     - '<.*>'                                # Surpressed
     - '\|\|[^\|]+\|\|'                      # Spoilers
     - '@(everyone|here|[!&]?[0-9]{17,21})'  # Mentions
-  expandIgnoreRegexes:
-    # Don't ever display these URLs, stop redirecting and use the previous useful link instead
-    - 'http[s]?://(?:w{3}\.)?instagram\.com/accounts/login'
 
 logger:
   level: info

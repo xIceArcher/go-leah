@@ -2,6 +2,7 @@ package twitter
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/dghubble/oauth1"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/utils"
+	"go.uber.org/zap"
 )
 
 const (
@@ -24,7 +26,9 @@ var ErrNotFound = errors.New("resource not found")
 type API struct{}
 
 var (
-	api          *twitter.Client
+	api                 *twitter.Client
+	expandIgnoreRegexes []*regexp.Regexp
+
 	apiSetupOnce sync.Once
 )
 
@@ -35,6 +39,17 @@ func NewAPI(cfg *config.TwitterConfig) API {
 		httpClient := config.Client(oauth1.NoContext, token)
 
 		api = twitter.NewClient(httpClient)
+
+		for _, r := range cfg.ExpandIgnoreRegexes {
+			regex, err := regexp.Compile(r)
+			if err != nil {
+				zap.S().Warn(fmt.Sprintf("Regex %s is invalid", regex))
+				continue
+			}
+
+			expandIgnoreRegexes = append(expandIgnoreRegexes, regex)
+		}
+
 	})
 
 	return API{}

@@ -77,11 +77,11 @@ func (b *DiscordBot) Run(ctx context.Context) error {
 	logger.Info("Starting bot...")
 
 	b.session.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
-		logger := zap.S().With(
-			"guild", m.GuildID,
-			"channel", m.ChannelID,
-			"user", m.Author.Username,
-			"messageID", m.ID,
+		logger := logger.With(
+			zap.String("guild", m.GuildID),
+			zap.String("channel", m.ChannelID),
+			zap.String("user", m.Author.Username),
+			zap.String("messageID", m.ID),
 		)
 
 		// Ignore messages by self
@@ -147,8 +147,8 @@ func (b *DiscordBot) handleCommand(ctx context.Context, s *discordgo.Session, m 
 	for _, command := range b.commands {
 		if msgCommand == command.Name {
 			commandLogger := logger.With(
-				"command", command.Name,
-				"args", msgArgs,
+				zap.String("command", command.Name),
+				zap.Strings("args", msgArgs),
 			)
 
 			if command.Configs.IsAdminOnly && m.Author.ID != b.Cfg.Discord.AdminID {
@@ -193,24 +193,24 @@ func (b *DiscordBot) handleMessage(ctx context.Context, s *discordgo.Session, m 
 			msg = regex.ReplaceAllLiteralString(msg, "")
 		}
 
-		messageLogger := logger.With(
-			"handler", handler.Name(),
+		logger := logger.With(
+			zap.String("handler", handler.Name()),
 		)
 
 		defer func() {
 			if r := recover(); r != nil {
-				messageLogger.With("panic", r).Error("Handler panicked")
+				logger.With("panic", r).Error("Handler panicked")
 			}
 		}()
 
-		matches, err := handler.Handle(ctx, b.Cfg, s, m.ChannelID, msg)
+		matches, err := handler.Handle(s, m.ChannelID, msg, logger)
 		if err != nil {
-			messageLogger.With("matches", matches).With(zap.Error(err)).Error("Handle message")
+			logger.With(zap.Strings("matches", matches)).With(zap.Error(err)).Error("Handle message")
 			continue
 		}
 
 		if len(matches) > 0 {
-			messageLogger.With("matches", matches).Info("Success")
+			logger.With(zap.Strings("matches", matches)).Info("Success")
 		}
 	}
 }

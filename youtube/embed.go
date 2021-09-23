@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/consts"
 	"github.com/xIceArcher/go-leah/utils"
 )
@@ -16,7 +15,7 @@ var (
 	ErrNoStartTime   = errors.New("cannot parse start time")
 )
 
-func (v *Video) GetEmbed(cfg *config.Config, onlyLivestream bool) (embed *discordgo.MessageEmbed, err error) {
+func (v *Video) GetEmbed(onlyLivestream bool) (embed *discordgo.MessageEmbed, err error) {
 	if onlyLivestream && v.LiveStreamingDetails == nil {
 		return nil, ErrNotLivestream
 	}

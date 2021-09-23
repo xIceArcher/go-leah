@@ -55,9 +55,7 @@ func main() {
 	if err := bot.Run(ctx); err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to start bot")
 	}
-	defer func() {
-		bot.Close()
-	}()
+	defer bot.Close()
 
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM)

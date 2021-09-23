@@ -27,18 +27,18 @@ func (h *YoutubeLiveStreamHandler) Setup(ctx context.Context, cfg *config.Config
 	return err
 }
 
-func (h *YoutubeLiveStreamHandler) Handle(ctx context.Context, cfg *config.Config, session *discordgo.Session, channelID string, msg string) (videoIDs []string, err error) {
+func (h *YoutubeLiveStreamHandler) Handle(session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (videoIDs []string, err error) {
 	videoIDs = h.Match(msg)
 	embeds := make([]*discordgo.MessageEmbed, 0, len(videoIDs))
 
 	for _, videoID := range videoIDs {
 		if len(embeds) == 10 {
-			zap.S().Warn("More than 10 embeds in one message")
+			logger.Warn("More than 10 embeds in one message")
 			break
 		}
 
-		logger := zap.S().With(
-			"videoID", videoID,
+		logger := logger.With(
+			zap.String("videoID", videoID),
 		)
 
 		video, err := h.api.GetVideo(videoID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
@@ -47,7 +47,7 @@ func (h *YoutubeLiveStreamHandler) Handle(ctx context.Context, cfg *config.Confi
 			continue
 		}
 
-		videoEmbed, err := video.GetEmbed(cfg, true)
+		videoEmbed, err := video.GetEmbed(true)
 		if errors.Is(err, youtube.ErrNotLivestream) {
 			logger.Info("Not a livestream")
 			continue

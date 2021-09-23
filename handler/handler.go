@@ -8,12 +8,13 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/utils"
+	"go.uber.org/zap"
 )
 
 type MessageHandler interface {
 	Name() string
 	Setup(ctx context.Context, cfg *config.Config, regexp []*regexp.Regexp) error
-	Handle(ctx context.Context, cfg *config.Config, session *discordgo.Session, channelID string, msg string) ([]string, error)
+	Handle(session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error)
 }
 
 var implementedHandlers []MessageHandler = []MessageHandler{

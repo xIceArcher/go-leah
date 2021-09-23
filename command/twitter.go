@@ -40,7 +40,7 @@ func Embed(ctx context.Context, cfg *config.Config, session *discordgo.Session, 
 		return err
 	}
 
-	if _, err = session.ChannelMessageSendEmbeds(msg.ChannelID, tweet.GetEmbeds(cfg.Discord)); err != nil {
+	if _, err = session.ChannelMessageSendEmbeds(msg.ChannelID, tweet.GetEmbeds()); err != nil {
 		return err
 	}
 
@@ -84,7 +84,7 @@ func Photos(ctx context.Context, cfg *config.Config, session *discordgo.Session,
 		return nil
 	}
 
-	embeds := tweet.GetPhotoEmbeds(cfg.Discord)[1:]
+	embeds := tweet.GetPhotoEmbeds()[1:]
 	_, err = session.ChannelMessageSendEmbeds(msg.ChannelID, embeds)
 	return err
 }
@@ -150,7 +150,7 @@ func Quoted(ctx context.Context, cfg *config.Config, session *discordgo.Session,
 		return err
 	}
 
-	_, err = session.ChannelMessageSendEmbeds(msg.ChannelID, tweet.QuotedStatus.GetEmbeds(cfg.Discord))
+	_, err = session.ChannelMessageSendEmbeds(msg.ChannelID, tweet.QuotedStatus.GetEmbeds())
 	if err != nil {
 		return err
 	}
