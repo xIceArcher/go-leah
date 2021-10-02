@@ -3,7 +3,6 @@ package youtube
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/xIceArcher/go-leah/config"
@@ -19,6 +18,8 @@ const (
 
 	LiveBroadcastContentNone = "none"
 )
+
+var ErrNotFound = errors.New("resource not found")
 
 type API struct{}
 
@@ -43,7 +44,7 @@ func (API) GetVideo(id string, parts []string) (*Video, error) {
 	}
 
 	if len(videosInfo.Items) == 0 {
-		return nil, fmt.Errorf("video %s not found", id)
+		return nil, ErrNotFound
 	}
 
 	videoInfo := videosInfo.Items[0]
@@ -90,7 +91,7 @@ func (API) GetChannel(id string, parts []string) (*Channel, error) {
 	}
 
 	if len(channelsInfo.Items) == 0 {
-		return nil, fmt.Errorf("channel %s not found", id)
+		return nil, ErrNotFound
 	}
 
 	channelInfo := channelsInfo.Items[0]

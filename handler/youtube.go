@@ -43,7 +43,12 @@ func (h *YoutubeLiveStreamHandler) Handle(session *discordgo.Session, channelID 
 
 		video, err := h.api.GetVideo(videoID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
 		if err != nil {
-			logger.With(zap.Error(err)).Error("Get video info")
+			if err == youtube.ErrNotFound {
+				logger.Info("Video not found")
+			} else {
+				logger.With(zap.Error(err)).Error("Get video info")
+			}
+
 			continue
 		}
 
