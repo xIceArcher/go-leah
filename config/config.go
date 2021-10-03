@@ -46,14 +46,15 @@ type DiscordConfig struct {
 	Prefix  string `yaml:"prefix"`
 	AdminID string `yaml:"adminID"`
 
-	Commands map[string]*DiscordCommandConfig `yaml:"commands"`
+	Cogs     map[string]*DiscordCogConfig     `yaml:"cogs"`
 	Handlers map[string]*DiscordHandlerConfig `yaml:"handlers"`
 
 	FilterRegexes []string `yaml:"filterRegexes"`
 }
 
-type DiscordCommandConfig struct {
-	IsAdminOnly bool `yaml:"isAdminOnly"`
+type DiscordCogConfig struct {
+	IsAdminOnly bool     `yaml:"isAdminOnly"`
+	Commands    []string `yaml:"commands"`
 }
 
 type DiscordHandlerConfig struct {

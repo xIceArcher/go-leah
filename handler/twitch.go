@@ -21,7 +21,7 @@ type TwitchLiveStreamHandler struct {
 	RegexManager
 }
 
-func (TwitchLiveStreamHandler) Name() string {
+func (TwitchLiveStreamHandler) String() string {
 	return "twitchLiveStream"
 }
 

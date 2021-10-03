@@ -17,7 +17,7 @@ type YoutubeLiveStreamHandler struct {
 	RegexManager
 }
 
-func (YoutubeLiveStreamHandler) Name() string {
+func (YoutubeLiveStreamHandler) String() string {
 	return "youtubeLiveStream"
 }
 

@@ -12,7 +12,7 @@ import (
 )
 
 type MessageHandler interface {
-	Name() string
+	String() string
 	Setup(ctx context.Context, cfg *config.Config, regexp []*regexp.Regexp) error
 	Handle(session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error)
 }
@@ -23,10 +23,10 @@ var implementedHandlers []MessageHandler = []MessageHandler{
 	&TwitchLiveStreamHandler{},
 }
 
-func SetupHandlers(ctx context.Context, cfg *config.Config) (handlers []MessageHandler, err error) {
+func SetupHandlers(ctx context.Context, cfg *config.Config, logger *zap.SugaredLogger) (handlers []MessageHandler, err error) {
 	availableHandlers := make(map[string]MessageHandler)
 	for _, handler := range implementedHandlers {
-		availableHandlers[handler.Name()] = handler
+		availableHandlers[handler.String()] = handler
 	}
 
 	for name, handlerCfg := range cfg.Discord.Handlers {
@@ -56,6 +56,7 @@ func SetupHandlers(ctx context.Context, cfg *config.Config) (handlers []MessageH
 		handlers = append(handlers, handler)
 	}
 
+	logger.Infof("Loaded handlers %s", handlers)
 	return handlers, nil
 }
 

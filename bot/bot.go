@@ -2,7 +2,6 @@ package bot
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -11,7 +10,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
 
-	"github.com/xIceArcher/go-leah/command"
+	"github.com/xIceArcher/go-leah/cog"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/handler"
 )
@@ -22,29 +21,16 @@ type DiscordBot struct {
 	Prefix  string
 
 	session       *discordgo.Session
-	commands      []*command.DiscordBotCommand
+	cogMap        map[string]cog.Cog
 	handlers      []handler.MessageHandler
 	filterRegexes []*regexp.Regexp
 }
 
-const (
-	CommandRestart = "restart"
-)
-
 func New(
 	cfg *config.Config,
-	commands []*command.DiscordBotCommand, handlers []handler.MessageHandler,
+	cogs []cog.Cog, handlers []handler.MessageHandler,
 	intents discordgo.Intent,
 ) (bot *DiscordBot, err error) {
-	existingCommands := make(map[string]struct{})
-	for _, command := range commands {
-		if _, ok := existingCommands[command.Name]; ok {
-			return nil, errors.New("duplicate command")
-		}
-
-		existingCommands[command.Name] = struct{}{}
-	}
-
 	filterRegexes := make([]*regexp.Regexp, 0, len(cfg.Discord.FilterRegexes))
 	for _, regexStr := range cfg.Discord.FilterRegexes {
 		regex, err := regexp.Compile(regexStr)
@@ -55,11 +41,18 @@ func New(
 		filterRegexes = append(filterRegexes, regex)
 	}
 
+	cogMap := make(map[string]cog.Cog)
+	for _, cog := range cogs {
+		for _, command := range cog.ActiveCommands() {
+			cogMap[command.String()] = cog
+		}
+	}
+
 	bot = &DiscordBot{
 		Cfg:    cfg,
 		Prefix: cfg.Discord.Prefix,
 
-		commands:      commands,
+		cogMap:        cogMap,
 		handlers:      handlers,
 		filterRegexes: filterRegexes,
 	}
@@ -143,58 +136,54 @@ func (b *DiscordBot) handleCommand(ctx context.Context, s *discordgo.Session, m 
 	msgSplit := strings.Split(msg, " ")
 	msgCommand, msgArgs := msgSplit[0], msgSplit[1:]
 
-	// Return upon matching any command, should only match one
-	for _, command := range b.commands {
-		if msgCommand == command.Name {
-			commandLogger := logger.With(
-				zap.String("command", command.Name),
-				zap.Strings("args", msgArgs),
-			)
+	commandLogger := logger.With(
+		zap.String("command", msgCommand),
+		zap.Strings("args", msgArgs),
+	)
 
-			if command.Configs.IsAdminOnly && m.Author.ID != b.Cfg.Discord.AdminID {
-				commandLogger.Info("Invalid user")
-				return
+	defer func() {
+		if r := recover(); r != nil {
+			commandLogger.With("panic", r).Error("Command panicked")
+		}
+	}()
+
+	if msgCommand == (cog.RestartCommand{}).String() {
+		if err := b.Restart(ctx); err != nil {
+			logger.With(zap.Error(err)).Info("Failed to restart bot")
+			panic(err)
+		}
+
+		if _, err := s.ChannelMessageSend(m.ChannelID, "Restarted bot!"); err != nil {
+			logger.With(zap.Error(err)).Error("Failed to send restart message")
+		}
+
+		return
+	}
+
+	if c, ok := b.cogMap[msgCommand]; ok {
+		if err := c.Handle(msgCommand, s, m.Message, msgArgs, commandLogger); err != nil {
+			switch err {
+			case cog.ErrInsufficientPermissions:
+				commandLogger.Info("Insufficient permissions")
+			default:
+				commandLogger.With(zap.Error(err)).Error("Command error")
 			}
-
-			defer func() {
-				if r := recover(); r != nil {
-					commandLogger.With("panic", r).Error("Command panicked")
-				}
-			}()
-
-			if msgCommand == CommandRestart {
-				if err := b.Restart(ctx); err != nil {
-					logger.With(zap.Error(err)).Info("Failed to restart bot")
-					panic(err)
-				}
-
-				if _, err := s.ChannelMessageSend(m.ChannelID, "Restarted bot!"); err != nil {
-					commandLogger.With(zap.Error(err)).Error("Failed to send restart message")
-				}
-
-				return
-			}
-
-			if err := command.HandlerFunc(ctx, b.Cfg, s, m.Message, msgArgs); err != nil {
-				commandLogger.With(zap.Error(err)).Error("Command")
-				return
-			}
-
-			commandLogger.Info("Success")
 			return
 		}
+
+		commandLogger.Info("Success")
 	}
 }
 
 func (b *DiscordBot) handleMessage(ctx context.Context, s *discordgo.Session, m *discordgo.MessageCreate, logger *zap.SugaredLogger) {
-	for _, handler := range b.handlers {
+	for _, h := range b.handlers {
 		msg := m.Content
 		for _, regex := range b.filterRegexes {
 			msg = regex.ReplaceAllLiteralString(msg, "")
 		}
 
 		logger := logger.With(
-			zap.String("handler", handler.Name()),
+			zap.String("handler", h.String()),
 		)
 
 		defer func() {
@@ -203,14 +192,17 @@ func (b *DiscordBot) handleMessage(ctx context.Context, s *discordgo.Session, m 
 			}
 		}()
 
-		matches, err := handler.Handle(s, m.ChannelID, msg, logger)
+		matches, err := h.Handle(s, m.ChannelID, msg, logger)
+		logger = logger.With(
+			zap.Strings("matches", matches),
+		)
 		if err != nil {
-			logger.With(zap.Strings("matches", matches)).With(zap.Error(err)).Error("Handle message")
+			logger.With(zap.Error(err)).Error("Handle message")
 			continue
 		}
 
 		if len(matches) > 0 {
-			logger.With(zap.Strings("matches", matches)).Info("Success")
+			logger.Info("Success")
 		}
 	}
 }

@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/xIceArcher/go-leah/bot"
-	"github.com/xIceArcher/go-leah/command"
+	"github.com/xIceArcher/go-leah/cog"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/handler"
 	"github.com/xIceArcher/go-leah/logger"
@@ -37,17 +37,17 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	commands, err := command.GetCommands(cfg.Discord.Commands)
+	cogs, err := cog.SetupCogs(ctx, cfg, logger)
 	if err != nil {
-		logger.With(zap.Error(err)).Fatal("Failed to load commands")
+		logger.With(zap.Error(err)).Fatal("Failed to load cogs")
 	}
 
-	messageHandlers, err := handler.SetupHandlers(ctx, cfg)
+	handlers, err := handler.SetupHandlers(ctx, cfg, logger)
 	if err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to load handlers")
 	}
 
-	bot, err := bot.New(cfg, commands, messageHandlers, discordgo.IntentsGuilds|discordgo.IntentsGuildMessages)
+	bot, err := bot.New(cfg, cogs, handlers, discordgo.IntentsGuilds|discordgo.IntentsGuildMessages)
 	if err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to initialize bot")
 	}

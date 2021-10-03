@@ -22,15 +22,18 @@ discord:
   token:
   prefix: "!!"
   adminID:
-  commands:
+  cogs:
     admin:
       isAdminOnly: true
-    restart:
-      isAdminOnly: true
-    embed:
-    photos:
-    video:
-    quoted:
+      commands:
+        - servers
+        - restart
+    twitter:
+      commands:
+        - embed
+        - photos
+        - video
+        - quoted
   handlers:
     youtubeLiveStream:
       regexes:

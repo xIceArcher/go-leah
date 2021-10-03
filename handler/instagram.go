@@ -20,7 +20,7 @@ type InstagramPostHandler struct {
 	RegexManager
 }
 
-func (InstagramPostHandler) Name() string {
+func (InstagramPostHandler) String() string {
 	return "instagramPost"
 }
 
