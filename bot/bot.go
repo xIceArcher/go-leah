@@ -133,7 +133,7 @@ func (b *DiscordBot) Restart(ctx context.Context) error {
 
 func (b *DiscordBot) handleCommand(ctx context.Context, s *discordgo.Session, m *discordgo.MessageCreate, logger *zap.SugaredLogger) {
 	msg := m.Content[len(b.Prefix):]
-	msgSplit := strings.Split(msg, " ")
+	msgSplit := strings.Fields(msg)
 	msgCommand, msgArgs := msgSplit[0], msgSplit[1:]
 
 	commandLogger := logger.With(
