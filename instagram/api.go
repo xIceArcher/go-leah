@@ -64,11 +64,16 @@ func (API) GetPost(shortcode string) (*Post, error) {
 		text = rawPost.EdgesMediaToCaption.Edges[0].Node.Text
 	}
 
+	fullName := rawPost.Owner.FullName
+	if fullName == "" {
+		fullName = rawPost.Owner.Username
+	}
+
 	return &Post{
 		Shortcode: shortcode,
 		Owner: &User{
 			Username:      rawPost.Owner.Username,
-			Fullname:      rawPost.Owner.FullName,
+			Fullname:      fullName,
 			ProfilePicURL: rawPost.Owner.ProfilePicURL,
 		},
 
