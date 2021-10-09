@@ -58,7 +58,7 @@ func (t *Tweet) standardMainEmbed() *discordgo.MessageEmbed {
 }
 
 func (t *Tweet) retweetMainEmbed() *discordgo.MessageEmbed {
-	embed := t.standardMainEmbed()
+	embed := t.RetweetedStatus.GetEmbeds()[0]
 	embed.Title = fmt.Sprintf("Retweeted %s (@%s)", t.RetweetedStatus.User.Name, t.RetweetedStatus.User.ScreenName)
 
 	return embed
