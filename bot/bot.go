@@ -161,7 +161,7 @@ func (b *DiscordBot) handleCommand(ctx context.Context, s *discordgo.Session, m 
 	}
 
 	if c, ok := b.cogMap[msgCommand]; ok {
-		if err := c.Handle(msgCommand, s, m.Message, msgArgs, commandLogger); err != nil {
+		if err := c.Handle(ctx, msgCommand, s, m.Message, msgArgs, commandLogger); err != nil {
 			switch err {
 			case cog.ErrInsufficientPermissions:
 				commandLogger.Info("Insufficient permissions")

@@ -21,7 +21,7 @@ var (
 
 type Cog interface {
 	Setup(ctx context.Context, cfg *config.Config) error
-	Handle(command string, session *discordgo.Session, msg *discordgo.Message, args []string, logger *zap.SugaredLogger) error
+	Handle(ctx context.Context, command string, session *discordgo.Session, msg *discordgo.Message, args []string, logger *zap.SugaredLogger) error
 
 	Commands() []Command
 
@@ -49,13 +49,13 @@ func (c *DiscordBotCog) Setup(cog Cog, cfg *config.Config) {
 	c.adminID = cfg.Discord.AdminID
 }
 
-func (c *DiscordBotCog) Handle(command string, session *discordgo.Session, msg *discordgo.Message, args []string, logger *zap.SugaredLogger) error {
+func (c *DiscordBotCog) Handle(ctx context.Context, command string, session *discordgo.Session, msg *discordgo.Message, args []string, logger *zap.SugaredLogger) error {
 	if c.IsCommandActive(command) {
 		if c.cogCfg.IsAdminOnly && msg.Author.ID != c.adminID {
 			return ErrInsufficientPermissions
 		}
 
-		return c.activeCommandMap[command].Handle(session, msg.ChannelID, args, logger)
+		return c.activeCommandMap[command].Handle(ctx, session, msg.ChannelID, args, logger)
 	}
 
 	return nil
@@ -86,7 +86,7 @@ func (c *DiscordBotCog) ActivateCommand(commandName string) error {
 }
 
 type Command interface {
-	Handle(session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) error
+	Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) error
 	String() string
 }
 

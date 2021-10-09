@@ -36,7 +36,7 @@ func (ServersCommand) String() string {
 	return "servers"
 }
 
-func (ServersCommand) Handle(session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) error {
+func (ServersCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) error {
 	guilds := make([]string, 0)
 	for _, guild := range session.State.Guilds {
 		guilds = append(guilds, guild.Name)
@@ -52,7 +52,7 @@ func (RestartCommand) String() string {
 	return "restart"
 }
 
-func (RestartCommand) Handle(session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) error {
+func (RestartCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) error {
 	// Dummy command, restart is handled earlier in the call stack
 	return nil
 }

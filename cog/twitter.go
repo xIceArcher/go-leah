@@ -50,7 +50,7 @@ func (EmbedCommand) String() string {
 	return "embed"
 }
 
-func (EmbedCommand) Handle(session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
+func (EmbedCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
 	if len(args) == 0 {
 		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
 		return err
@@ -90,7 +90,7 @@ func (PhotosCommand) String() string {
 	return "photos"
 }
 
-func (PhotosCommand) Handle(session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
+func (PhotosCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
 	if len(args) == 0 {
 		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
 		return err
@@ -131,7 +131,7 @@ func (VideoCommand) String() string {
 	return "video"
 }
 
-func (VideoCommand) Handle(session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
+func (VideoCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
 	if len(args) == 0 {
 		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
 		return err
@@ -170,7 +170,7 @@ func (QuotedCommand) String() string {
 	return "quoted"
 }
 
-func (QuotedCommand) Handle(session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
+func (QuotedCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
 	if len(args) == 0 {
 		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
 		return err
