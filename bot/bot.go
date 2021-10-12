@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/google/shlex"
 	"go.uber.org/zap"
 
 	"github.com/xIceArcher/go-leah/cog"
@@ -133,7 +134,12 @@ func (b *DiscordBot) Restart(ctx context.Context) error {
 
 func (b *DiscordBot) handleCommand(ctx context.Context, s *discordgo.Session, m *discordgo.MessageCreate, logger *zap.SugaredLogger) {
 	msg := m.Content[len(b.Prefix):]
-	msgSplit := strings.Fields(msg)
+	msgSplit, err := shlex.Split(msg)
+	if err != nil {
+		logger.With(zap.String("msg", msg)).Error("Failed to parse args")
+		return
+	}
+
 	msgCommand, msgArgs := msgSplit[0], msgSplit[1:]
 
 	commandLogger := logger.With(

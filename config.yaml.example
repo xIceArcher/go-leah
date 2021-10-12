@@ -18,6 +18,13 @@ twitch:
   clientID:
   clientSecret:
 
+qnap:
+  isEnabled: true
+  url:
+  username:
+  password:
+  downloadBasePath:
+
 discord:
   token:
   prefix: "!!"
@@ -34,6 +41,9 @@ discord:
         - photos
         - video
         - quoted
+    download:
+      commands:
+        - streamlink
   handlers:
     youtubeLiveStream:
       regexes:

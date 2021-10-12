@@ -12,6 +12,7 @@ type Config struct {
 	Google    *GoogleConfig  `yaml:"google"`
 	Instagram *InstaConfig   `yaml:"instagram"`
 	Twitch    *TwitchConfig  `yaml:"twitch"`
+	QNAP      *QNAPConfig    `yaml:"qnap"`
 
 	Discord *DiscordConfig `yaml:"discord"`
 
@@ -39,6 +40,14 @@ type InstaConfig struct {
 type TwitchConfig struct {
 	ClientID     string `yaml:"clientID"`
 	ClientSecret string `yaml:"clientSecret"`
+}
+
+type QNAPConfig struct {
+	IsEnabled        bool   `yaml:"isEnabled"`
+	URL              string `yaml:"url"`
+	Username         string `yaml:"username"`
+	Password         string `yaml:"password"`
+	DownloadBasePath string `yaml:"downloadBasePath"`
 }
 
 type DiscordConfig struct {

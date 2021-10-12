@@ -12,6 +12,7 @@ import (
 var implementedCogs []Cog = []Cog{
 	&AdminCog{},
 	&TwitterCog{},
+	&DownloadCog{},
 }
 
 var (
