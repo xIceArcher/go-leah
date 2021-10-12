@@ -66,3 +66,13 @@ func Unique(ss []string) []string {
 
 	return ret
 }
+
+func Contains(ss []string, toFind string) bool {
+	for _, s := range ss {
+		if s == toFind {
+			return true
+		}
+	}
+
+	return false
+}

@@ -64,6 +64,7 @@ type DiscordConfig struct {
 type DiscordCogConfig struct {
 	IsAdminOnly bool     `yaml:"isAdminOnly"`
 	Commands    []string `yaml:"commands"`
+	ChannelIDs  []string `yaml:"channelIDs"`
 }
 
 type DiscordHandlerConfig struct {

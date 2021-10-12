@@ -6,6 +6,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
+	"github.com/xIceArcher/go-leah/utils"
 	"go.uber.org/zap"
 )
 
@@ -18,6 +19,7 @@ var implementedCogs []Cog = []Cog{
 var (
 	ErrNotImplemented          error = fmt.Errorf("not implemented")
 	ErrInsufficientPermissions error = fmt.Errorf("insufficient permissions")
+	ErrIllegalAccess           error = fmt.Errorf("illegal access")
 )
 
 type Cog interface {
@@ -54,6 +56,10 @@ func (c *DiscordBotCog) Handle(ctx context.Context, command string, session *dis
 	if c.IsCommandActive(command) {
 		if c.cogCfg.IsAdminOnly && msg.Author.ID != c.adminID {
 			return ErrInsufficientPermissions
+		}
+
+		if len(c.cogCfg.ChannelIDs) > 0 && !utils.Contains(c.cogCfg.ChannelIDs, msg.ChannelID) {
+			return ErrIllegalAccess
 		}
 
 		return c.activeCommandMap[command].Handle(ctx, session, msg.ChannelID, args, logger)

@@ -171,6 +171,8 @@ func (b *DiscordBot) handleCommand(ctx context.Context, s *discordgo.Session, m 
 			switch err {
 			case cog.ErrInsufficientPermissions:
 				commandLogger.Info("Insufficient permissions")
+			case cog.ErrIllegalAccess:
+				commandLogger.Info("Illegal access")
 			default:
 				commandLogger.With(zap.Error(err)).Error("Command error")
 			}

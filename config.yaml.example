@@ -35,6 +35,8 @@ discord:
       commands:
         - servers
         - restart
+      channelIDs:
+        - 611545994890313738
     twitter:
       commands:
         - embed
