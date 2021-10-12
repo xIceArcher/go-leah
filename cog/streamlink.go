@@ -59,7 +59,7 @@ func (StreamlinkCommand) String() string {
 	return "streamlink"
 }
 
-func (c *StreamlinkCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) error {
+func (c *StreamlinkCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
 	if len(args) < 2 {
 		return nil
 	}
@@ -69,6 +69,18 @@ func (c *StreamlinkCommand) Handle(ctx context.Context, session *discordgo.Sessi
 	if err != nil {
 		return err
 	}
+
+	var listType m3u8.ListType
+	defer func() {
+		if err != nil {
+			session.ChannelMessageSend(channelID, fmt.Sprintf("Failed to complete streamlink %s, error: %s", fileName, err.Error()))
+			return
+		}
+
+		if listType == m3u8.MEDIA {
+			session.ChannelMessageSend(channelID, fmt.Sprintf("Successfully completed streamlink %s", fileName))
+		}
+	}()
 
 	resp, err := client.Get(m3u8UrlStr)
 	if err != nil {
@@ -84,12 +96,15 @@ func (c *StreamlinkCommand) Handle(ctx context.Context, session *discordgo.Sessi
 	var downloadedFiles []string
 	switch listType {
 	case m3u8.MEDIA:
-		dir := fmt.Sprintf("%s-%s", channelID, time.Now().Format(consts.TimeFormatYYMMDDHHMMSS))
+		dir := fmt.Sprintf("%s-%s", time.Now().Format(consts.TimeFormatYYMMDDHHMMSS), channelID)
 		if err := os.Mkdir(dir, os.ModePerm); err != nil {
 			return err
 		}
 
 		mediaList := playlist.(*m3u8.MediaPlaylist)
+
+		session.ChannelMessageSend(channelID, fmt.Sprintf("Starting to download %s", fileName))
+
 		downloadedFiles, err = handleMediaPlaylist(ctx, m3u8Url, mediaList.Key, dir, logger)
 		if err != nil {
 			return err
@@ -107,12 +122,17 @@ func (c *StreamlinkCommand) Handle(ctx context.Context, session *discordgo.Sessi
 			return err
 		}
 
-		return c.Handle(ctx, session, channelID, []string{mediaUrl.String()}, logger)
+		return c.Handle(ctx, session, channelID, []string{mediaUrl.String(), fileName}, logger)
 	default:
 		return fmt.Errorf("unknown M3U8 type %v", listType)
 	}
 
-	return uploadFile(fileName, downloadedFiles, logger)
+	if qnapConfig.IsEnabled {
+		session.ChannelMessageSend(channelID, fmt.Sprintf("Stream closed, starting to upload %s", fileName))
+		return uploadFile(fileName, downloadedFiles, logger)
+	}
+
+	return nil
 }
 
 type DownloadedFile struct {
@@ -123,18 +143,18 @@ type DownloadedFile struct {
 func handleMediaPlaylist(ctx context.Context, m3u8Url *url.URL, key *m3u8.Key, dir string, logger *zap.SugaredLogger) (downloadFiles []string, err error) {
 	isEncrypted := key != nil
 
-	var keyBytes []byte
+	var block cipher.Block
 	if isEncrypted {
-		keyBytes, err = downloadKey(ctx, m3u8Url, key)
+		keyBytes, err := downloadKey(ctx, m3u8Url, key)
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	block, err := aes.NewCipher(keyBytes)
-	if err != nil {
-		logger.Error(err)
-		return
+		block, err = aes.NewCipher(keyBytes)
+		if err != nil {
+			logger.Error(err)
+			return nil, err
+		}
 	}
 
 	var wg sync.WaitGroup
