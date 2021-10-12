@@ -161,7 +161,7 @@ func (a *QNAPAPI) UploadMany(dir string, fileName string, filePaths []string) er
 			break
 		}
 
-		logger.Infof("Uploaded fragment %v/%v", i, len(fileInfos))
+		logger.Infof("Uploaded fragment %v/%v", i+1, len(fileInfos))
 	}
 
 	return nil
