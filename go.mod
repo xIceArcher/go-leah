@@ -10,7 +10,9 @@ require (
 	github.com/go-resty/resty/v2 v2.6.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/grafov/m3u8 v0.11.1
+	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-retryablehttp v0.7.0
+	github.com/jessevdk/go-flags v1.5.0
 	github.com/jinzhu/configor v1.2.1
 	github.com/nicklaw5/helix v1.25.0
 	github.com/relvacode/iso8601 v1.1.0
