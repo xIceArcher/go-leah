@@ -123,6 +123,10 @@ func (c *StreamlinkCommand) Handle(ctx context.Context, session *discordgo.Sessi
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP request to %s returned status %v", resp.Request.URL.String(), resp.StatusCode)
+	}
+
 	playlist, listType, err := m3u8.DecodeFrom(resp.Body, true)
 	if err != nil {
 		return err
@@ -249,6 +253,10 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 				}
 				defer resp.Body.Close()
 
+				if resp.StatusCode != http.StatusOK {
+					return fmt.Errorf("HTTP request to %s returned status %v", resp.Request.URL.String(), resp.StatusCode)
+				}
+
 				playlist, _, err := m3u8.DecodeFrom(resp.Body, true)
 				if err != nil {
 					return err
@@ -304,9 +312,9 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 				logger.Error(err)
 				errCount++
 
-				if errCount > 5 {
+				if errCount > 10 {
 					logger.Error("Too many errors when getting M3U8, aborting...")
-					break
+					doneCh <- 1
 				}
 			}
 
@@ -349,6 +357,10 @@ func downloadKey(ctx context.Context, client *retryablehttp.Client, m3u8Url *url
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP request to %s returned status %v", resp.Request.URL.String(), resp.StatusCode)
+	}
+
 	return io.ReadAll(resp.Body)
 }
 
@@ -388,6 +400,10 @@ func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryable
 					return err
 				}
 				defer resp.Body.Close()
+
+				if resp.StatusCode != http.StatusOK {
+					return fmt.Errorf("HTTP request to %s returned status %v", resp.Request.URL.String(), resp.StatusCode)
+				}
 
 				bytes, err := io.ReadAll(resp.Body)
 				if err != nil {
