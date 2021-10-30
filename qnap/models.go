@@ -20,3 +20,10 @@ type ChunkedUploadResponse struct {
 	StatusMixin
 	Size string `json:"size"`
 }
+
+type StatResponse struct {
+	Datas []struct {
+		FileName string `json:"filename"`
+		FileSize string `json:"filesize"`
+	} `json:"datas"`
+}

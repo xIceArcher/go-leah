@@ -11,4 +11,5 @@ const (
 var (
 	ErrNotLoggedIn error = fmt.Errorf("not logged in")
 	ErrFailed      error = fmt.Errorf("failed")
+	ErrNotFound    error = fmt.Errorf("not found")
 )

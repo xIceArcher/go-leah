@@ -18,6 +18,7 @@ type API interface {
 	Login(username string, password string) error
 	Logout() error
 	UploadMany(dir string, fileName string, filePaths []string) error
+	GetFileSize(path string, fileName string) (int64, error)
 }
 
 type QNAPAPI struct {
@@ -86,7 +87,7 @@ type FileInfo struct {
 	NumBytes int64
 }
 
-func (a *QNAPAPI) UploadMany(dir string, fileName string, filePaths []string) error {
+func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []string) error {
 	if a.sessionID == "" {
 		return ErrNotLoggedIn
 	}
@@ -99,10 +100,10 @@ func (a *QNAPAPI) UploadMany(dir string, fileName string, filePaths []string) er
 	logger := a.logger.With(zap.String("fileName", fileName))
 	logger.Infof("Uploading file of size %v...", units.HumanSize(float64(totalBytes)))
 
-	resp, err := a.postUtilRequest().
+	resp, err := a.utilRequest().
 		SetQueryParams(map[string]string{
 			"func":            "start_chunked_upload",
-			"upload_root_dir": dir,
+			"upload_root_dir": uploadDir,
 		}).
 		SetResult(&StartChunkedUploadResponse{}).
 		Post(a.utilRequestPath())
@@ -118,14 +119,14 @@ func (a *QNAPAPI) UploadMany(dir string, fileName string, filePaths []string) er
 	var offset int64
 	for i, file := range fileInfos {
 		for {
-			resp, err = a.postUtilRequest().
+			resp, err = a.utilRequest().
 				SetQueryParams(map[string]string{
 					"func":            "chunked_upload",
 					"upload_id":       startChunkedUploadResp.UploadID,
 					"offset":          strconv.FormatInt(offset, 10),
 					"overwrite":       "0",
-					"dest_path":       dir,
-					"upload_root_dir": dir,
+					"dest_path":       uploadDir,
+					"upload_root_dir": uploadDir,
 					"filesize":        strconv.FormatInt(totalBytes, 10),
 					"upload_name":     fileName,
 					"multipart":       "1",
@@ -164,10 +165,50 @@ func (a *QNAPAPI) UploadMany(dir string, fileName string, filePaths []string) er
 		logger.Infof("Uploaded fragment %v/%v", i+1, len(fileInfos))
 	}
 
+	actualFileSize, err := a.GetFileSize(uploadDir, fileName)
+	if err != nil {
+		return err
+	}
+
+	if actualFileSize != totalBytes {
+		return ErrFailed
+	}
+
 	return nil
 }
 
-func (a *QNAPAPI) postUtilRequest() *resty.Request {
+func (a *QNAPAPI) GetFileSize(path string, fileName string) (int64, error) {
+	if a.sessionID == "" {
+		return 0, ErrNotLoggedIn
+	}
+
+	resp, err := a.utilRequest().
+		SetQueryParams(map[string]string{
+			"func":       "stat",
+			"path":       path,
+			"file_total": "1",
+			"file_name":  fileName,
+		}).
+		SetResult(&StatResponse{}).
+		Get(a.utilRequestPath())
+	if err != nil {
+		return 0, err
+	}
+
+	statResp := resp.Result().(*StatResponse)
+	if len(statResp.Datas) == 0 || statResp.Datas[0].FileName != fileName {
+		return 0, ErrNotFound
+	}
+
+	fileSize, err := strconv.ParseInt(statResp.Datas[0].FileSize, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return fileSize, nil
+}
+
+func (a *QNAPAPI) utilRequest() *resty.Request {
 	return a.client.R().SetQueryParam("sid", a.sessionID)
 }
 
