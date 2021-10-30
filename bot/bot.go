@@ -134,6 +134,10 @@ func (b *DiscordBot) Restart(ctx context.Context) error {
 
 func (b *DiscordBot) handleCommand(ctx context.Context, s *discordgo.Session, m *discordgo.MessageCreate, logger *zap.SugaredLogger) {
 	msg := m.Content[len(b.Prefix):]
+	if msg == "" {
+		return
+	}
+
 	msgSplit, err := shlex.Split(msg)
 	if err != nil {
 		logger.With(zap.String("msg", msg)).Error("Failed to parse args")
