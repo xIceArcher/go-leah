@@ -246,7 +246,7 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 			}
 			return downloadFiles, nil
 		case <-time.After(sleepTime):
-			if func() error {
+			if err := func() error {
 				resp, err := client.Get(m3u8Url.String())
 				if err != nil {
 					return err
@@ -309,13 +309,15 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 
 				return nil
 			}(); err != nil {
-				logger.Error(err)
+				logger.With(zap.Int("errCount", errCount)).Error(err)
 				errCount++
 
-				if errCount > 10 {
+				if errCount >= 10 {
 					logger.Error("Too many errors when getting M3U8, aborting...")
 					doneCh <- 1
 				}
+
+				break
 			}
 
 			errCount = 0
