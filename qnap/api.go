@@ -53,18 +53,18 @@ func New(baseUrl string, logger *zap.SugaredLogger) (API, error) {
 }
 
 func (a *QNAPAPI) Login(username string, password string) error {
-	resp, err := a.client.R().
+	loginResp := &LoginResponse{}
+	_, err := a.client.R().
 		SetQueryParams(map[string]string{
 			"user": username,
 			"pwd":  base64.StdEncoding.EncodeToString([]byte(password)),
 		}).
-		SetResult(&LoginResponse{}).
+		SetResult(loginResp).
 		Get(a.url + "/wfm2Login.cgi")
 	if err != nil {
 		return err
 	}
 
-	loginResp := resp.Result().(*LoginResponse)
 	if loginResp.Status != StatusOK {
 		return ErrFailed
 	}
@@ -100,18 +100,18 @@ func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []stri
 	logger := a.logger.With(zap.String("fileName", fileName))
 	logger.Infof("Uploading file of size %v...", units.HumanSize(float64(totalBytes)))
 
-	resp, err := a.utilRequest().
+	startChunkedUploadResp := &StartChunkedUploadResponse{}
+	_, err = a.utilRequest().
 		SetQueryParams(map[string]string{
 			"func":            "start_chunked_upload",
 			"upload_root_dir": uploadDir,
 		}).
-		SetResult(&StartChunkedUploadResponse{}).
+		SetResult(startChunkedUploadResp).
 		Post(a.utilRequestPath())
 	if err != nil {
 		return err
 	}
 
-	startChunkedUploadResp := resp.Result().(*StartChunkedUploadResponse)
 	if startChunkedUploadResp.Status != StatusStartChunkedUploadOK {
 		return ErrFailed
 	}
@@ -119,7 +119,8 @@ func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []stri
 	var offset int64
 	for i, file := range fileInfos {
 		for {
-			resp, err = a.utilRequest().
+			chunkedUploadResp := &ChunkedUploadResponse{}
+			_, err := a.utilRequest().
 				SetQueryParams(map[string]string{
 					"func":            "chunked_upload",
 					"upload_id":       startChunkedUploadResp.UploadID,
@@ -135,14 +136,13 @@ func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []stri
 					"fileName": path.Base(file.Path),
 				}).
 				SetFile("file", file.Path).
-				SetResult(&ChunkedUploadResponse{}).
+				SetResult(chunkedUploadResp).
 				Post(a.utilRequestPath())
 			if err != nil {
 				logger.With(zap.Error(err)).Warn("Error uploading fragment")
 				continue
 			}
 
-			chunkedUploadResp := resp.Result().(*ChunkedUploadResponse)
 			if chunkedUploadResp.Status != StatusOK {
 				logger.Warnf("Chunked upload returned error %v", chunkedUploadResp.Status)
 				continue
@@ -182,20 +182,20 @@ func (a *QNAPAPI) GetFileSize(path string, fileName string) (int64, error) {
 		return 0, ErrNotLoggedIn
 	}
 
-	resp, err := a.utilRequest().
+	statResp := &StatResponse{}
+	_, err := a.utilRequest().
 		SetQueryParams(map[string]string{
 			"func":       "stat",
 			"path":       path,
 			"file_total": "1",
 			"file_name":  fileName,
 		}).
-		SetResult(&StatResponse{}).
+		SetResult(statResp).
 		Get(a.utilRequestPath())
 	if err != nil {
 		return 0, err
 	}
 
-	statResp := resp.Result().(*StatResponse)
 	if len(statResp.Datas) == 0 || statResp.Datas[0].FileName != fileName {
 		return 0, ErrNotFound
 	}
