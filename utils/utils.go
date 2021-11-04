@@ -53,15 +53,14 @@ func ParseHexColor(s string) int {
 	return int(colorInt)
 }
 
-func Unique(ss []string) []string {
+func Unique(ss []string) (ret []string) {
 	mp := make(map[string]struct{})
-	for _, s := range ss {
-		mp[s] = struct{}{}
-	}
 
-	ret := make([]string, 0, len(ss))
-	for s := range mp {
-		ret = append(ret, s)
+	for _, s := range ss {
+		if _, ok := mp[s]; !ok {
+			ret = append(ret, s)
+			mp[s] = struct{}{}
+		}
 	}
 
 	return ret
