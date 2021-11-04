@@ -30,7 +30,7 @@ func (h *InstagramPostHandler) Setup(ctx context.Context, cfg *config.Config, re
 	return err
 }
 
-func (h *InstagramPostHandler) Handle(session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (shortcodes []string, err error) {
+func (h *InstagramPostHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (shortcodes []string, err error) {
 	shortcodes = h.Match(msg)
 
 	for _, shortcode := range shortcodes {

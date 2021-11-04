@@ -16,7 +16,10 @@ const (
 	PartContentDetails       = "contentDetails"
 	PartSnippet              = "snippet"
 
-	LiveBroadcastContentNone = "none"
+	LiveBroadcastContentNone     = "none"
+	LiveBroadcastContentUpcoming = "upcoming"
+	LiveBroadcastContentLive     = "live"
+	LiveBroadcastContentDone     = "done"
 )
 
 var ErrNotFound = errors.New("resource not found")
@@ -67,7 +70,9 @@ func (API) GetVideo(id string, parts []string) (*Video, error) {
 		video.ThumbnailURL = thumbnail.Url
 	}
 
-	if videoInfo.Snippet.LiveBroadcastContent != LiveBroadcastContentNone {
+	video.IsDone = videoInfo.Snippet.LiveBroadcastContent == LiveBroadcastContentNone || videoInfo.Snippet.LiveBroadcastContent == LiveBroadcastContentDone
+
+	if videoInfo.LiveStreamingDetails != nil {
 		video.LiveStreamingDetails = &LiveStreamingDetails{
 			ConcurrentViewers: videoInfo.LiveStreamingDetails.ConcurrentViewers,
 		}
@@ -78,6 +83,10 @@ func (API) GetVideo(id string, parts []string) (*Video, error) {
 
 		if scheduledStartTime, ok := utils.ParseISOTime(videoInfo.LiveStreamingDetails.ScheduledStartTime); ok {
 			video.LiveStreamingDetails.ScheduledStartTime = scheduledStartTime
+		}
+
+		if actualEndTime, ok := utils.ParseISOTime(videoInfo.LiveStreamingDetails.ActualEndTime); ok {
+			video.LiveStreamingDetails.ActualEndTime = actualEndTime
 		}
 	}
 

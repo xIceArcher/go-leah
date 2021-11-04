@@ -31,7 +31,7 @@ func (h *TwitchLiveStreamHandler) Setup(ctx context.Context, cfg *config.Config,
 	return err
 }
 
-func (h *TwitchLiveStreamHandler) Handle(session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (loginNames []string, err error) {
+func (h *TwitchLiveStreamHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (loginNames []string, err error) {
 	loginNames = h.Match(msg)
 	embeds := make([]*discordgo.MessageEmbed, 0, len(loginNames))
 

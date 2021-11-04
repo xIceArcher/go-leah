@@ -14,7 +14,7 @@ import (
 type MessageHandler interface {
 	String() string
 	Setup(ctx context.Context, cfg *config.Config, regexp []*regexp.Regexp) error
-	Handle(session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error)
+	Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error)
 }
 
 var implementedHandlers []MessageHandler = []MessageHandler{

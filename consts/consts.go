@@ -1,6 +1,8 @@
 package consts
 
 const (
+	ColorNone = "000000"
+
 	ColorRed   = "FF0000"
 	ColorAmber = "FF9300"
 	ColorGreen = "00FF00"

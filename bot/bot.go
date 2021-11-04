@@ -204,7 +204,7 @@ func (b *DiscordBot) handleMessage(ctx context.Context, s *discordgo.Session, m 
 			}
 		}()
 
-		matches, err := h.Handle(s, m.ChannelID, msg, logger)
+		matches, err := h.Handle(ctx, s, m.ChannelID, msg, logger)
 		logger = logger.With(
 			zap.Strings("matches", matches),
 		)

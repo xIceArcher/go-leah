@@ -14,6 +14,7 @@ type Video struct {
 
 	ThumbnailURL string
 
+	IsDone               bool
 	LiveStreamingDetails *LiveStreamingDetails
 
 	Channel *Channel
@@ -22,6 +23,7 @@ type Video struct {
 type LiveStreamingDetails struct {
 	ActualStartTime    time.Time
 	ScheduledStartTime time.Time
+	ActualEndTime      time.Time
 
 	ConcurrentViewers uint64
 }

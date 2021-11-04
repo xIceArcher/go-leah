@@ -11,13 +11,17 @@ import (
 )
 
 var (
-	ErrNotLivestream = errors.New("not a livestreams")
+	ErrNotLiveStream = errors.New("not a livestream")
 	ErrNoStartTime   = errors.New("cannot parse start time")
 )
 
-func (v *Video) GetEmbed(onlyLivestream bool) (embed *discordgo.MessageEmbed, err error) {
-	if onlyLivestream && v.LiveStreamingDetails == nil {
-		return nil, ErrNotLivestream
+func (v *Video) GetEmbed(onlyNotDone bool) (embed *discordgo.MessageEmbed, err error) {
+	if v.LiveStreamingDetails == nil {
+		return nil, ErrNotLiveStream
+	}
+
+	if onlyNotDone && v.IsDone {
+		return nil, ErrNotLiveStream
 	}
 
 	actualStart := v.LiveStreamingDetails.ActualStartTime
@@ -28,20 +32,22 @@ func (v *Video) GetEmbed(onlyLivestream bool) (embed *discordgo.MessageEmbed, er
 	}
 
 	var startTime time.Time
-	if actualStart.IsZero() {
-		startTime = scheduledStart
-	} else if scheduledStart.IsZero() {
+	if scheduledStart.IsZero() {
 		startTime = actualStart
 	} else {
-		if actualStart.Before(scheduledStart) {
-			startTime = actualStart
-		} else {
-			startTime = scheduledStart
-		}
+		startTime = scheduledStart
 	}
 
+	isStreamEnded := !v.LiveStreamingDetails.ActualEndTime.IsZero() && time.Now().After(v.LiveStreamingDetails.ActualEndTime)
+
 	fields := make([]*discordgo.MessageEmbedField, 0)
-	if time.Now().After(startTime) {
+	if isStreamEnded {
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "Ended",
+			Value:  utils.FormatDiscordRelativeTime(v.LiveStreamingDetails.ActualEndTime),
+			Inline: true,
+		})
+	} else if time.Now().After(startTime) {
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   "Started",
 			Value:  utils.FormatDiscordRelativeTime(startTime),
@@ -72,7 +78,9 @@ func (v *Video) GetEmbed(onlyLivestream bool) (embed *discordgo.MessageEmbed, er
 	}
 
 	var color string
-	if time.Now().After(startTime) {
+	if isStreamEnded {
+		color = consts.ColorNone
+	} else if time.Now().After(startTime) {
 		color = consts.ColorRed
 	} else if time.Until(startTime) < time.Hour {
 		color = consts.ColorAmber
