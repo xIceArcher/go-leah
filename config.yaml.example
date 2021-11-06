@@ -63,6 +63,12 @@ discord:
     - '\|\|[^\|]+\|\|'                      # Spoilers
     - '@(everyone|here|[!&]?[0-9]{17,21})'  # Mentions
 
+redis:
+  host: "127.0.0.1"
+  port: 6379
+  password: ""
+  db: 0
+
 logger:
   level: info
   encoding: console

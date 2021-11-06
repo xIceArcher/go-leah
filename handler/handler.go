@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sync"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
@@ -11,20 +12,21 @@ import (
 	"go.uber.org/zap"
 )
 
-type MessageHandler interface {
+type Handler interface {
 	String() string
-	Setup(ctx context.Context, cfg *config.Config, regexp []*regexp.Regexp) error
+	Setup(ctx context.Context, cfg *config.Config, regexp []*regexp.Regexp, wg *sync.WaitGroup) error
+	Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger)
 	Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error)
 }
 
-var implementedHandlers []MessageHandler = []MessageHandler{
+var implementedHandlers []Handler = []Handler{
 	&YoutubeLiveStreamHandler{},
 	&InstagramPostHandler{},
 	&TwitchLiveStreamHandler{},
 }
 
-func SetupHandlers(ctx context.Context, cfg *config.Config, logger *zap.SugaredLogger) (handlers []MessageHandler, err error) {
-	availableHandlers := make(map[string]MessageHandler)
+func SetupHandlers(ctx context.Context, cfg *config.Config, wg *sync.WaitGroup, logger *zap.SugaredLogger) (handlers []Handler, err error) {
+	availableHandlers := make(map[string]Handler)
 	for _, handler := range implementedHandlers {
 		availableHandlers[handler.String()] = handler
 	}
@@ -49,7 +51,7 @@ func SetupHandlers(ctx context.Context, cfg *config.Config, logger *zap.SugaredL
 			regexes = append(regexes, regex)
 		}
 
-		if err := handler.Setup(ctx, cfg, regexes); err != nil {
+		if err := handler.Setup(ctx, cfg, regexes, wg); err != nil {
 			return nil, err
 		}
 

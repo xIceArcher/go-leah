@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -24,10 +25,13 @@ func (InstagramPostHandler) String() string {
 	return "instagramPost"
 }
 
-func (h *InstagramPostHandler) Setup(ctx context.Context, cfg *config.Config, regexes []*regexp.Regexp) (err error) {
+func (h *InstagramPostHandler) Setup(ctx context.Context, cfg *config.Config, regexes []*regexp.Regexp, wg *sync.WaitGroup) (err error) {
 	h.Regexes = regexes
 	h.api, err = instagram.NewAPI(cfg.Instagram)
 	return err
+}
+
+func (h *InstagramPostHandler) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
 }
 
 func (h *InstagramPostHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (shortcodes []string, err error) {

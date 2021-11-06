@@ -8,6 +8,7 @@ require (
 	github.com/dghubble/go-twitter v0.0.0-20211002212826-ad02880e616b
 	github.com/dghubble/oauth1 v0.7.0
 	github.com/docker/go-units v0.4.0
+	github.com/go-redis/redis/v8 v8.11.4
 	github.com/go-resty/resty/v2 v2.6.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -18,7 +19,6 @@ require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/jinzhu/configor v1.2.1
 	github.com/nicklaw5/helix v1.25.0
-	github.com/onsi/gomega v1.15.0 // indirect
 	github.com/relvacode/iso8601 v1.1.0
 	github.com/rickb777/date v1.16.1
 	github.com/rickb777/plural v1.4.1 // indirect

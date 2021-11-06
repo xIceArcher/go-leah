@@ -16,7 +16,8 @@ type Config struct {
 
 	Discord *DiscordConfig `yaml:"discord"`
 
-	Logger *zap.Config `yaml:"logger"`
+	Redis  *RedisConfig `yaml:"redis"`
+	Logger *zap.Config  `yaml:"logger"`
 }
 
 type TwitterConfig struct {
@@ -69,6 +70,13 @@ type DiscordCogConfig struct {
 
 type DiscordHandlerConfig struct {
 	Regexes []string `yaml:"regexes"`
+}
+
+type RedisConfig struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
 }
 
 func (c *Config) LoadConfig(path string) error {

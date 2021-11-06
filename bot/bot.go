@@ -23,13 +23,13 @@ type DiscordBot struct {
 
 	session       *discordgo.Session
 	cogMap        map[string]cog.Cog
-	handlers      []handler.MessageHandler
+	handlers      []handler.Handler
 	filterRegexes []*regexp.Regexp
 }
 
 func New(
 	cfg *config.Config,
-	cogs []cog.Cog, handlers []handler.MessageHandler,
+	cogs []cog.Cog, handlers []handler.Handler,
 	intents discordgo.Intent,
 ) (bot *DiscordBot, err error) {
 	filterRegexes := make([]*regexp.Regexp, 0, len(cfg.Discord.FilterRegexes))
@@ -98,6 +98,15 @@ func (b *DiscordBot) Run(ctx context.Context) error {
 	}
 
 	logger.Info("Bot started")
+
+	for _, handler := range b.handlers {
+		logger := logger.With(
+			zap.String("handler", handler.String()),
+		)
+		handler.Resume(ctx, b.session, logger)
+	}
+	logger.Info("Handlers resumed")
+
 	return nil
 }
 

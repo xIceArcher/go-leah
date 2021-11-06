@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
@@ -34,6 +35,9 @@ func main() {
 	logger := zap.S()
 	defer logger.Sync()
 
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -42,7 +46,7 @@ func main() {
 		logger.With(zap.Error(err)).Fatal("Failed to load cogs")
 	}
 
-	handlers, err := handler.SetupHandlers(ctx, cfg, logger)
+	handlers, err := handler.SetupHandlers(ctx, cfg, &wg, logger)
 	if err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to load handlers")
 	}
