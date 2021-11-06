@@ -26,6 +26,7 @@ import (
 	"github.com/xIceArcher/go-leah/consts"
 	"github.com/xIceArcher/go-leah/qnap"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 var qnapConfig *config.QNAPConfig
@@ -49,7 +50,6 @@ func NewStreamlinkClient(headers map[string]string) *retryablehttp.Client {
 		client:  client,
 		Headers: headers,
 	}
-	client.Logger = nil
 
 	return client
 }
@@ -132,7 +132,7 @@ func (c *StreamlinkCommand) Handle(ctx context.Context, session *discordgo.Sessi
 		return err
 	}
 
-	var downloadedFiles []string
+	var downloadedRuns [][]string
 	switch listType {
 	case m3u8.MEDIA:
 		dir := fmt.Sprintf("%s-%s", time.Now().Format(consts.TimeFormatYYMMDDHHMMSS), channelID)
@@ -144,7 +144,7 @@ func (c *StreamlinkCommand) Handle(ctx context.Context, session *discordgo.Sessi
 
 		session.ChannelMessageSend(channelID, fmt.Sprintf("Starting to download %s", commandArgs.Args.FileName))
 
-		downloadedFiles, err = handleMediaPlaylist(ctx, client, m3u8Url, mediaList.Key, dir, logger)
+		downloadedRuns, err = handleMediaPlaylist(ctx, client, m3u8Url, mediaList.Key, dir, logger)
 		if err != nil {
 			return err
 		}
@@ -169,7 +169,28 @@ func (c *StreamlinkCommand) Handle(ctx context.Context, session *discordgo.Sessi
 
 	if qnapConfig.IsEnabled {
 		session.ChannelMessageSend(channelID, fmt.Sprintf("Stream closed, starting to upload %s", commandArgs.Args.FileName))
-		return uploadFile(commandArgs.Args.FileName, downloadedFiles, logger)
+
+		extension := path.Ext(commandArgs.Args.FileName)
+		fileName := strings.TrimSuffix(commandArgs.Args.FileName, extension)
+
+		if extension == "" {
+			extension = ".ts"
+		}
+
+		if len(downloadedRuns) == 1 {
+			return uploadFile(fmt.Sprintf("%s%s", fileName, extension), downloadedRuns[0], logger)
+		} else {
+			wg := new(errgroup.Group)
+			for runNo, run := range downloadedRuns {
+				wg.Go(func() error {
+					return uploadFile(fmt.Sprintf("%s_%v%s", fileName, runNo+1, extension), run, logger)
+				})
+
+				if err := wg.Wait(); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	return nil
@@ -180,8 +201,9 @@ type DownloadedFile struct {
 	SeqNo int
 }
 
-func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8Url *url.URL, key *m3u8.Key, dir string, logger *zap.SugaredLogger) (downloadFiles []string, err error) {
+func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8Url *url.URL, key *m3u8.Key, dir string, logger *zap.SugaredLogger) (downloadRuns [][]string, err error) {
 	isEncrypted := key != nil
+	currRunNo := 0
 
 	var block cipher.Block
 	if isEncrypted {
@@ -216,7 +238,9 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 		wg.Wait()
 	}()
 
-	downloadedSegments := make(map[int]string)
+	downloadedRuns := make(map[int]map[int]string)
+	downloadedRuns[currRunNo] = make(map[int]string)
+
 	doneCh := make(chan int, 1)
 
 	var sleepTime time.Duration
@@ -229,22 +253,30 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 			return nil, nil
 		case <-doneCh:
 			logger.Info("Stream closed")
-			files := make([]*DownloadedFile, 0, len(downloadedSegments))
-			for seqNo, filePath := range downloadedSegments {
-				files = append(files, &DownloadedFile{
-					Name:  filePath,
-					SeqNo: seqNo,
+			runs := make([][]*DownloadedFile, 0, len(downloadedRuns))
+			for runNo, runSegments := range downloadedRuns {
+				runs = append(runs, make([]*DownloadedFile, 0, len(runSegments)))
+				for seqNo, filePath := range runSegments {
+					runs[runNo] = append(runs[runNo], &DownloadedFile{
+						Name:  filePath,
+						SeqNo: seqNo,
+					})
+				}
+
+				sort.Slice(runs[runNo], func(i, j int) bool {
+					return runs[runNo][i].SeqNo < runs[runNo][j].SeqNo
 				})
 			}
-			sort.Slice(files, func(i, j int) bool {
-				return files[i].SeqNo < files[j].SeqNo
-			})
 
-			downloadFiles = make([]string, 0, len(files))
-			for _, file := range files {
-				downloadFiles = append(downloadFiles, file.Name)
+			downloadRuns = make([][]string, 0, len(runs))
+			for runNo, run := range runs {
+				downloadRuns = append(downloadRuns, make([]string, 0, len(runs)))
+				for _, file := range run {
+					downloadRuns[runNo] = append(downloadRuns[runNo], file.Name)
+				}
 			}
-			return downloadFiles, nil
+
+			return downloadRuns, nil
 		case <-time.After(sleepTime):
 			if err := func() error {
 				resp, err := client.Get(m3u8Url.String())
@@ -273,14 +305,22 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 						continue
 					}
 
-					seqNo := i + int(mediaList.SeqNo)
-					if _, ok := downloadedSegments[seqNo]; ok {
-						continue
-					}
-
 					segmentUrl, err := m3u8Url.Parse(segment.URI)
 					if err != nil {
 						return err
+					}
+
+					fileName := filepath.Join(dir, path.Base(segmentUrl.Path))
+
+					seqNo := i + int(mediaList.SeqNo)
+					currRunSegments := downloadedRuns[currRunNo]
+					if existingFileName, ok := currRunSegments[seqNo]; ok {
+						if fileName == existingFileName {
+							continue
+						}
+
+						currRunNo++
+						downloadedRuns[currRunNo] = make(map[int]string)
 					}
 
 					var iv []byte
@@ -293,14 +333,13 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 						}
 					}
 
-					fileName := filepath.Join(dir, path.Base(segmentUrl.Path))
 					segmentUrlChan <- &Segment{
 						FileName: fileName,
 						URL:      segmentUrl,
 						IV:       iv,
 					}
 
-					downloadedSegments[seqNo] = fileName
+					downloadedRuns[currRunNo][seqNo] = fileName
 				}
 
 				if mediaList.Closed {
