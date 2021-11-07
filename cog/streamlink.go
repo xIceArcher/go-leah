@@ -220,7 +220,7 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 	}
 
 	var wg sync.WaitGroup
-	segmentUrlChan := make(chan *Segment, 1000)
+	segmentUrlChan := make(chan *Segment, 10000)
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
@@ -412,13 +412,12 @@ type PlaylistConfig struct {
 }
 
 type Segment struct {
-	FileName   string
-	URL        *url.URL
-	IV         []byte
-	NumRetries int
+	FileName string
+	URL      *url.URL
+	IV       []byte
 }
 
-func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryablehttp.Client, segmentChan chan *Segment, logger *zap.SugaredLogger) {
+func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryablehttp.Client, segmentChan <-chan *Segment, logger *zap.SugaredLogger) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -429,49 +428,49 @@ func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryable
 			}
 
 			segmentLogger := logger.With(zap.String("url", segment.URL.String()))
-			if err := func() error {
-				out, err := os.Create(segment.FileName)
-				if err != nil {
-					return err
-				}
-				defer out.Close()
 
-				resp, err := client.Get(segment.URL.String())
-				if err != nil {
-					return err
-				}
-				defer resp.Body.Close()
+			numRetries := 0
+			for numRetries < 5 {
+				if err := func() error {
+					out, err := os.Create(segment.FileName)
+					if err != nil {
+						return err
+					}
+					defer out.Close()
 
-				if resp.StatusCode != http.StatusOK {
-					return fmt.Errorf("HTTP request to %s returned status %v", resp.Request.URL.String(), resp.StatusCode)
-				}
+					resp, err := client.Get(segment.URL.String())
+					if err != nil {
+						return err
+					}
+					defer resp.Body.Close()
 
-				bytes, err := io.ReadAll(resp.Body)
-				if err != nil {
-					return err
-				}
+					if resp.StatusCode != http.StatusOK {
+						return fmt.Errorf("HTTP request to %s returned status %v", resp.Request.URL.String(), resp.StatusCode)
+					}
 
-				if cfg.IsEncrypted {
-					mode := cipher.NewCBCDecrypter(cfg.Block, segment.IV)
-					mode.CryptBlocks(bytes, bytes)
-				}
+					bytes, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return err
+					}
 
-				if _, err = out.Write(bytes); err != nil {
-					return err
-				}
+					if cfg.IsEncrypted {
+						mode := cipher.NewCBCDecrypter(cfg.Block, segment.IV)
+						mode.CryptBlocks(bytes, bytes)
+					}
 
-				segmentLogger.Info("Downloaded")
-				return nil
-			}(); err != nil {
-				segmentLogger.Error(err)
+					if _, err = out.Write(bytes); err != nil {
+						return err
+					}
 
-				if segment.NumRetries > 5 {
-					segmentLogger.Error("Exceeded number of retries")
+					segmentLogger.Info("Downloaded")
+					return nil
+				}(); err != nil {
+					segmentLogger.With(zap.Int("numRetries", numRetries)).Error(err)
+					numRetries++
 					continue
 				}
 
-				segment.NumRetries++
-				segmentChan <- segment
+				break
 			}
 		}
 	}
