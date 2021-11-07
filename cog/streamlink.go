@@ -220,7 +220,7 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 	}
 
 	var wg sync.WaitGroup
-	segmentUrlChan := make(chan *Segment)
+	segmentUrlChan := make(chan *Segment, 1000)
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
