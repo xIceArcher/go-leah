@@ -187,13 +187,13 @@ func (h *YoutubeLiveStreamHandler) watchVideo(ctx context.Context, video *youtub
 			video, err = h.api.GetVideo(video.ID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
 			if err != nil {
 				logger.With(zap.Error(err)).Error("Failed to get video")
-				break
+				return
 			}
 
 			embed, err := video.GetEmbed(false)
 			if err != nil {
 				logger.With(zap.Error(err)).Error("Failed to get embed")
-				break
+				return
 			}
 
 			updatableEmbed.MessageEmbed = embed
