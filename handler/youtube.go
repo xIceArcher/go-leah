@@ -173,13 +173,6 @@ func (h *YoutubeLiveStreamHandler) watchVideo(ctx context.Context, video *youtub
 			nextTickTime = time.Now().Add(5 * time.Minute)
 		}
 
-		var ticker *time.Ticker
-		if nextTickTime.Before(time.Now()) {
-			ticker = time.NewTicker(0)
-		} else {
-			ticker = time.NewTicker(time.Until(nextTickTime))
-		}
-
 		select {
 		case <-ctx.Done():
 			// Cannot use ctx here since it has already been cancelled
@@ -188,7 +181,7 @@ func (h *YoutubeLiveStreamHandler) watchVideo(ctx context.Context, video *youtub
 				logger.With(zap.Error(err)).Error("Failed to write to cache")
 			}
 			return
-		case <-ticker.C:
+		case <-time.After(time.Until(nextTickTime)):
 			video, err = h.api.GetVideo(video.ID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
 			if err != nil {
 				logger.With(zap.Error(err)).Error("Failed to get video")
