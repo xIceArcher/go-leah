@@ -173,7 +173,12 @@ func (h *YoutubeLiveStreamHandler) watchVideo(ctx context.Context, video *youtub
 			nextTickTime = time.Now().Add(5 * time.Minute)
 		}
 
-		ticker := time.NewTicker(time.Until(nextTickTime))
+		var ticker *time.Ticker
+		if nextTickTime.Before(time.Now()) {
+			ticker = time.NewTicker(0)
+		} else {
+			ticker = time.NewTicker(time.Until(nextTickTime))
+		}
 
 		select {
 		case <-ctx.Done():
