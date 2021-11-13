@@ -6,27 +6,25 @@ import (
 )
 
 type RawResp struct {
-	EntryData struct {
-		PostPage []struct {
-			GraphQL struct {
-				ShortcodeMedia RawPost `json:"shortcode_media"`
-			} `json:"graphql"`
-		} `json:"PostPage"`
-	} `json:"entry_data"`
+	Items []RawPost `json:"items"`
 }
 
-type RawEdge struct {
-	Node struct {
-		Text       string `json:"text"`
-		DisplayURL string `json:"display_url"`
-		IsVideo    bool   `json:"is_video"`
-		VideoURL   string `json:"video_url"`
-	} `json:"node"`
-}
+type RawPost struct {
+	Shortcode string `json:"code"`
 
-type RawEdges struct {
-	Edges []RawEdge `json:"edges"`
-	Count int       `json:"count"`
+	User RawUser `json:"user"`
+
+	Caption struct {
+		Text string `json:"text"`
+	} `json:"caption"`
+
+	CarouselMedia []*RawCarouselMedia `json:"carousel_media"`
+
+	ImageVersions *RawImageVersions `json:"image_versions2"`
+	VideoVersions []*RawVideo       `json:"video_versions"`
+
+	LikeCount        int   `json:"like_count"`
+	TakenAtTimestamp int64 `json:"taken_at"`
 }
 
 type RawUser struct {
@@ -35,33 +33,53 @@ type RawUser struct {
 	ProfilePicURL string `json:"profile_pic_url"`
 }
 
-type RawPost struct {
-	Shortcode string  `json:"shortcode"`
-	Owner     RawUser `json:"owner"`
+type RawCarouselMedia struct {
+	ImageVersions *RawImageVersions `json:"image_versions2"`
+	VideoVersions []*RawVideo       `json:"video_versions"`
+}
 
-	EdgeSidecarToChildren RawEdges `json:"edge_sidecar_to_children"`
-	EdgesMediaToCaption   RawEdges `json:"edge_media_to_caption"`
-	EdgeMediaPreviewLike  RawEdges `json:"edge_media_preview_like"`
+func (m *RawCarouselMedia) IsVideo() bool {
+	return len(m.VideoVersions) > 0
+}
 
-	DisplayURL string `json:"display_url"`
-	IsVideo    bool   `json:"is_video"`
-	VideoURL   string `json:"video_url"`
+type RawImageVersions struct {
+	Candidates []RawImage `json:"candidates"`
+}
 
-	TakenAtTimestamp int64 `json:"taken_at_timestamp"`
+type RawImage struct {
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+	URL    string `json:"url"`
+}
+
+type RawVideo struct {
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+	URL    string `json:"url"`
 }
 
 func (p *RawPost) extractPhotoURLs() []string {
 	photoURLs := make([]string, 0)
-	for _, edge := range p.EdgeSidecarToChildren.Edges {
-		if edge.Node.IsVideo {
+
+	if p.ImageVersions != nil && len(p.VideoVersions) == 0 {
+		p.CarouselMedia = append(p.CarouselMedia, &RawCarouselMedia{
+			ImageVersions: p.ImageVersions,
+		})
+	}
+
+	for _, media := range p.CarouselMedia {
+		if media.IsVideo() {
 			continue
 		}
 
-		photoURLs = append(photoURLs, edge.Node.DisplayURL)
-	}
+		currBestIdx := 0
+		for i, image := range media.ImageVersions.Candidates {
+			if image.Width*image.Height > media.ImageVersions.Candidates[i].Width*media.ImageVersions.Candidates[i].Height {
+				currBestIdx = i
+			}
+		}
 
-	if len(photoURLs) == 0 {
-		return []string{p.DisplayURL}
+		photoURLs = append(photoURLs, media.ImageVersions.Candidates[currBestIdx].URL)
 	}
 
 	return photoURLs
@@ -69,16 +87,26 @@ func (p *RawPost) extractPhotoURLs() []string {
 
 func (p *RawPost) extractVideoURLs() []string {
 	videoURLs := make([]string, 0)
-	for _, edge := range p.EdgeSidecarToChildren.Edges {
-		if !edge.Node.IsVideo {
+
+	if len(p.VideoVersions) > 0 {
+		p.CarouselMedia = append(p.CarouselMedia, &RawCarouselMedia{
+			VideoVersions: p.VideoVersions,
+		})
+	}
+
+	for _, media := range p.CarouselMedia {
+		if !media.IsVideo() {
 			continue
 		}
 
-		videoURLs = append(videoURLs, edge.Node.VideoURL)
-	}
+		currBestIdx := 0
+		for i, video := range media.VideoVersions {
+			if video.Width*video.Height > media.VideoVersions[i].Width*media.VideoVersions[i].Height {
+				currBestIdx = i
+			}
+		}
 
-	if len(videoURLs) == 0 && p.IsVideo {
-		return []string{p.VideoURL}
+		videoURLs = append(videoURLs, media.VideoVersions[currBestIdx].URL)
 	}
 
 	return videoURLs

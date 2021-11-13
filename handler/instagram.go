@@ -78,9 +78,12 @@ func (h *InstagramPostHandler) Handle(ctx context.Context, session *discordgo.Se
 			})
 		}
 
-		embeds[len(embeds)-1].Image = &discordgo.MessageEmbedImage{
-			URL: post.PhotoURLs[0],
+		if len(post.PhotoURLs) > 0 {
+			embeds[len(embeds)-1].Image = &discordgo.MessageEmbedImage{
+				URL: post.PhotoURLs[0],
+			}
 		}
+
 		embeds[len(embeds)-1].Fields = []*discordgo.MessageEmbedField{
 			{
 				Name:   "Likes",
@@ -89,13 +92,15 @@ func (h *InstagramPostHandler) Handle(ctx context.Context, session *discordgo.Se
 			},
 		}
 
-		for _, photoURL := range post.PhotoURLs[1:] {
-			embeds = append(embeds, &discordgo.MessageEmbed{
-				Image: &discordgo.MessageEmbedImage{
-					URL: photoURL,
-				},
-				Color: utils.ParseHexColor(consts.ColorInsta),
-			})
+		if len(post.PhotoURLs) > 0 {
+			for _, photoURL := range post.PhotoURLs[1:] {
+				embeds = append(embeds, &discordgo.MessageEmbed{
+					Image: &discordgo.MessageEmbedImage{
+						URL: photoURL,
+					},
+					Color: utils.ParseHexColor(consts.ColorInsta),
+				})
+			}
 		}
 
 		embeds[len(embeds)-1].Footer = &discordgo.MessageEmbedFooter{

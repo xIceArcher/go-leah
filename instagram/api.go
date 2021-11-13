@@ -52,33 +52,27 @@ func (API) GetPost(shortcode string) (*Post, error) {
 		return nil, err
 	}
 
-	postPage := rawResp.EntryData.PostPage
-	if len(postPage) == 0 {
+	if len(rawResp.Items) == 0 {
 		return nil, errors.New("failed to get post")
 	}
 
-	rawPost := postPage[0].GraphQL.ShortcodeMedia
+	rawPost := rawResp.Items[0]
 
-	var text string
-	if len(rawPost.EdgesMediaToCaption.Edges) != 0 {
-		text = rawPost.EdgesMediaToCaption.Edges[0].Node.Text
-	}
-
-	fullName := rawPost.Owner.FullName
+	fullName := rawPost.User.FullName
 	if fullName == "" {
-		fullName = rawPost.Owner.Username
+		fullName = rawPost.User.Username
 	}
 
 	return &Post{
 		Shortcode: shortcode,
 		Owner: &User{
-			Username:      rawPost.Owner.Username,
+			Username:      rawPost.User.Username,
 			Fullname:      fullName,
-			ProfilePicURL: rawPost.Owner.ProfilePicURL,
+			ProfilePicURL: rawPost.User.ProfilePicURL,
 		},
 
-		Text:      text,
-		Likes:     rawPost.EdgeMediaPreviewLike.Count,
+		Text:      rawPost.Caption.Text,
+		Likes:     rawPost.LikeCount,
 		Timestamp: time.Unix(rawPost.TakenAtTimestamp, 0),
 
 		PhotoURLs: rawPost.extractPhotoURLs(),
