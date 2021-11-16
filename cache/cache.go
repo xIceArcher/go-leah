@@ -4,19 +4,34 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/xIceArcher/go-leah/config"
 )
 
 var (
+	ErrNotFound error = fmt.Errorf("not found")
+)
+
+type Cache interface {
+	Set(ctx context.Context, key string, val interface{}) error
+	SetWithExpiry(ctx context.Context, key string, val interface{}, expiration time.Duration) error
+
+	Get(ctx context.Context, key string) (interface{}, error)
+	GetByPrefix(ctx context.Context, prefix string) (ret map[string]interface{}, err error)
+
+	Clear(ctx context.Context, key ...string) error
+}
+
+var (
 	redisCache          *redis.Client
 	redisCacheSetupOnce sync.Once
 )
 
-type Cache struct{}
+type RedisCache struct{}
 
-func NewCache(cfg *config.RedisConfig) (*Cache, error) {
+func NewRedisCache(cfg *config.RedisConfig) (Cache, error) {
 	redisCacheSetupOnce.Do(func() {
 		redisCache = redis.NewClient(&redis.Options{
 			Addr:     fmt.Sprintf("%s:%v", cfg.Host, cfg.Port),
@@ -25,18 +40,35 @@ func NewCache(cfg *config.RedisConfig) (*Cache, error) {
 		})
 	})
 
-	return &Cache{}, nil
+	return &RedisCache{}, nil
 }
 
-func (Cache) Set(ctx context.Context, key string, val interface{}) error {
+func (RedisCache) Set(ctx context.Context, key string, val interface{}) error {
 	return redisCache.Set(ctx, key, val, 0).Err()
 }
 
-func (Cache) Clear(ctx context.Context, key ...string) error {
+func (RedisCache) SetWithExpiry(ctx context.Context, key string, val interface{}, expiration time.Duration) error {
+	return redisCache.Set(ctx, key, val, expiration).Err()
+}
+
+func (RedisCache) Get(ctx context.Context, key string) (interface{}, error) {
+	results, err := redisCache.MGet(ctx, key).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(results) == 0 || results[0] == nil {
+		return nil, ErrNotFound
+	}
+
+	return results[0], nil
+}
+
+func (RedisCache) Clear(ctx context.Context, key ...string) error {
 	return redisCache.Del(ctx, key...).Err()
 }
 
-func (Cache) GetByPrefix(ctx context.Context, prefix string) (ret map[string]interface{}, err error) {
+func (RedisCache) GetByPrefix(ctx context.Context, prefix string) (ret map[string]interface{}, err error) {
 	const prefixFormat = "%s*"
 	var cursor uint64
 

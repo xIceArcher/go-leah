@@ -24,8 +24,8 @@ const (
 )
 
 type YoutubeLiveStreamHandler struct {
-	api   *youtube.API
-	cache *cache.Cache
+	api   youtube.API
+	cache cache.Cache
 	wg    *sync.WaitGroup
 
 	RegexManager
@@ -38,13 +38,12 @@ func (YoutubeLiveStreamHandler) String() string {
 func (h *YoutubeLiveStreamHandler) Setup(ctx context.Context, cfg *config.Config, regexes []*regexp.Regexp, wg *sync.WaitGroup) (err error) {
 	h.Regexes = regexes
 	h.wg = wg
-
-	h.api, err = youtube.NewAPI(cfg.Google)
+	h.cache, err = cache.NewRedisCache(cfg.Redis)
 	if err != nil {
 		return err
 	}
 
-	h.cache, err = cache.NewCache(cfg.Redis)
+	h.api, err = youtube.NewCachedAPI(cfg.Google, h.cache, zap.S())
 	return err
 }
 
@@ -71,7 +70,7 @@ func (h *YoutubeLiveStreamHandler) Resume(ctx context.Context, session *discordg
 
 		videoID := fmt.Sprintf("%v", taskValue)
 
-		video, err := h.api.GetVideo(videoID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
+		video, err := h.api.GetVideo(ctx, videoID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
 		if err != nil {
 			logger.With(zap.Error(err), zap.String("videoID", videoID)).Warnf("Failed to get video")
 			continue
@@ -108,7 +107,7 @@ func (h *YoutubeLiveStreamHandler) Handle(ctx context.Context, session *discordg
 			zap.String("videoID", videoID),
 		)
 
-		video, err := h.api.GetVideo(videoID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
+		video, err := h.api.GetVideo(ctx, videoID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
 		if err != nil {
 			if err == youtube.ErrNotFound {
 				logger.Info("Video not found")
@@ -182,7 +181,7 @@ func (h *YoutubeLiveStreamHandler) watchVideo(ctx context.Context, video *youtub
 			}
 			return
 		case <-time.After(time.Until(nextTickTime)):
-			video, err = h.api.GetVideo(video.ID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
+			video, err = h.api.GetVideo(ctx, video.ID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
 			if err != nil {
 				logger.With(zap.Error(err)).Error("Failed to get video")
 				return
