@@ -18,10 +18,12 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/docker/go-units"
 	"github.com/grafov/m3u8"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/jessevdk/go-flags"
+	"github.com/ricochet2200/go-disk-usage/du"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/consts"
 	"github.com/xIceArcher/go-leah/qnap"
@@ -72,7 +74,21 @@ func (c *DownloadCog) Setup(ctx context.Context, cfg *config.Config) error {
 func (DownloadCog) Commands() []Command {
 	return []Command{
 		&StreamlinkCommand{},
+		&DiskCommand{},
 	}
+}
+
+type DiskCommand struct{}
+
+func (DiskCommand) String() string {
+	return "disk"
+}
+
+func (c *DiskCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
+	usage := du.NewDiskUsage(".")
+
+	_, err = session.ChannelMessageSend(channelID, fmt.Sprintf("Available space: %v", units.HumanSize(float64(usage.Free()))))
+	return err
 }
 
 type StreamlinkCommand struct{}

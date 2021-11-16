@@ -239,6 +239,8 @@ github.com/rickb777/date v1.16.1/go.mod h1:QwU+l0bIHSFsMQH12voxZbC531J+lM3A/ZFq5
 github.com/rickb777/plural v1.3.0/go.mod h1:xyHbelv4YvJE51gjMnHvk+U2e9zIysg6lTnSQK8XUYA=
 github.com/rickb777/plural v1.4.1 h1:5MMLcbIaapLFmvDGRT5iPk8877hpTPt8Y9cdSKRw9sU=
 github.com/rickb777/plural v1.4.1/go.mod h1:kdmXUpmKBJTS0FtG/TFumd//VBWsNTD7zOw7x4umxNw=
+github.com/ricochet2200/go-disk-usage/du v0.0.0-20210707232629-ac9918953285 h1:d54EL9l+XteliUfUCGsEwwuk65dmmxX85VXF+9T6+50=
+github.com/ricochet2200/go-disk-usage/du v0.0.0-20210707232629-ac9918953285/go.mod h1:fxIDly1xtudczrZeOOlfaUvd2OPb2qZAPuWdU2BsBTk=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=

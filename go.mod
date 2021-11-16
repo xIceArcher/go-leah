@@ -22,6 +22,7 @@ require (
 	github.com/relvacode/iso8601 v1.1.0
 	github.com/rickb777/date v1.16.1
 	github.com/rickb777/plural v1.4.1 // indirect
+	github.com/ricochet2200/go-disk-usage/du v0.0.0-20210707232629-ac9918953285 // indirect
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
