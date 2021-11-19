@@ -196,7 +196,7 @@ func (h *YoutubeLiveStreamHandler) watchVideo(ctx context.Context, video *youtub
 			updatableEmbed.MessageEmbed = embed
 			if err := updatableEmbed.Update(); err != nil {
 				logger.With(zap.Error(err)).Error("Failed to update embed")
-				break
+				return
 			}
 
 			if video.IsDone {
