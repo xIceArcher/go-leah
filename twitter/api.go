@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,10 +66,10 @@ func (a *API) GetTweet(id string) (*Tweet, error) {
 		TweetMode: tweetModeExtended,
 	})
 	if err != nil {
-		if resp.StatusCode == http.StatusNotFound {
-			return nil, ErrNotFound
-		}
 		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
 	}
 
 	t, err := a.parseTweet(tweet)
@@ -89,6 +90,10 @@ func (a *API) parseTweet(tweet *twitter.Tweet) (*Tweet, error) {
 	if text == "" {
 		text = tweet.Text
 	}
+
+	text = strings.ReplaceAll(text, "&amp;", "&")
+	text = strings.ReplaceAll(text, "&lt;", "<")
+	text = strings.ReplaceAll(text, "&gt;", ">")
 
 	u, err := a.parseUser(tweet.User)
 	if err != nil {
