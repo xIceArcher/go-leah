@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
@@ -18,9 +19,12 @@ func (AdminCog) String() string {
 	return "admin"
 }
 
-func (c *AdminCog) Setup(ctx context.Context, cfg *config.Config) error {
-	c.DiscordBotCog.Setup(c, cfg)
+func (c *AdminCog) Setup(ctx context.Context, cfg *config.Config, wg *sync.WaitGroup) error {
+	c.DiscordBotCog.Setup(c, cfg, wg)
 	return nil
+}
+
+func (c *AdminCog) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
 }
 
 func (AdminCog) Commands() []Command {

@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/relvacode/iso8601"
@@ -46,6 +47,30 @@ func FormatDurationSimple(d time.Duration) string {
 	minutes, hours := totalMinutes%60, totalMinutes/60
 
 	return fmt.Sprintf("%d:%02d:%02d", hours, minutes, seconds)
+}
+
+func FormatDuration(d time.Duration) string {
+	totalSeconds := int(d.Seconds())
+
+	seconds, totalMinutes := totalSeconds%60, totalSeconds/60
+	minutes, totalHours := totalMinutes%60, totalMinutes/60
+	hours, days := totalHours%24, totalHours/24
+
+	ret := ""
+	if days != 0 {
+		ret += strconv.Itoa(days) + "d "
+	}
+	if hours != 0 {
+		ret += strconv.Itoa(hours) + "h "
+	}
+	if minutes != 0 {
+		ret += strconv.Itoa(minutes) + "m "
+	}
+	if seconds != 0 {
+		ret += strconv.Itoa(seconds) + "s"
+	}
+
+	return strings.TrimSpace(ret)
 }
 
 func ParseHexColor(s string) int {

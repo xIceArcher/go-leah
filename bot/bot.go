@@ -22,6 +22,7 @@ type DiscordBot struct {
 	Prefix  string
 
 	session       *discordgo.Session
+	cogs          []cog.Cog
 	cogMap        map[string]cog.Cog
 	handlers      []handler.Handler
 	filterRegexes []*regexp.Regexp
@@ -53,6 +54,7 @@ func New(
 		Cfg:    cfg,
 		Prefix: cfg.Discord.Prefix,
 
+		cogs:          cogs,
 		cogMap:        cogMap,
 		handlers:      handlers,
 		filterRegexes: filterRegexes,
@@ -98,6 +100,14 @@ func (b *DiscordBot) Run(ctx context.Context) error {
 	}
 
 	logger.Info("Bot started")
+
+	for _, cog := range b.cogs {
+		logger := logger.With(
+			zap.String("cog", cog.String()),
+		)
+		cog.Resume(ctx, b.session, logger)
+	}
+	logger.Info("Cogs resumed")
 
 	for _, handler := range b.handlers {
 		logger := logger.With(

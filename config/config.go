@@ -26,7 +26,7 @@ type TwitterConfig struct {
 	AccessToken    string `yaml:"accessToken"`
 	AccessSecret   string `yaml:"accessSecret"`
 
-	MaxStreamRestartRetries int      `yaml:"maxStreamRestartRetries" default:"5"`
+	MaxStreamRestartRetries int      `yaml:"maxStreamRestartRetries"`
 	ExpandIgnoreRegexes     []string `yaml:"expandIgnoreRegexes"`
 }
 

@@ -33,7 +33,7 @@ var (
 	apiSetupOnce sync.Once
 )
 
-func NewAPI(cfg *config.TwitterConfig) API {
+func NewAPI(cfg *config.TwitterConfig) *API {
 	apiSetupOnce.Do(func() {
 		config := oauth1.NewConfig(cfg.ConsumerKey, cfg.ConsumerSecret)
 		token := oauth1.NewToken(cfg.AccessToken, cfg.AccessSecret)
@@ -53,7 +53,7 @@ func NewAPI(cfg *config.TwitterConfig) API {
 
 	})
 
-	return API{}
+	return &API{}
 }
 
 func (a *API) GetTweet(id string) (*Tweet, error) {
@@ -223,6 +223,20 @@ func (a *API) GetUser(id string) (*User, error) {
 		}
 		return nil, err
 	}
+	return a.parseUser(user)
+}
+
+func (a *API) GetUserByScreenName(screenName string) (*User, error) {
+	user, resp, err := api.Users.Show(&twitter.UserShowParams{
+		ScreenName: screenName,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
 	return a.parseUser(user)
 }
 

@@ -52,6 +52,7 @@ func NewStreamlinkClient(headers map[string]string) *retryablehttp.Client {
 		client:  client,
 		Headers: headers,
 	}
+	client.Logger = nil
 
 	return client
 }
@@ -64,11 +65,14 @@ func (DownloadCog) String() string {
 	return "download"
 }
 
-func (c *DownloadCog) Setup(ctx context.Context, cfg *config.Config) error {
-	c.DiscordBotCog.Setup(c, cfg)
+func (c *DownloadCog) Setup(ctx context.Context, cfg *config.Config, wg *sync.WaitGroup) error {
+	c.DiscordBotCog.Setup(c, cfg, wg)
 	qnapConfig = cfg.QNAP
 
 	return nil
+}
+
+func (c *DownloadCog) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
 }
 
 func (DownloadCog) Commands() []Command {

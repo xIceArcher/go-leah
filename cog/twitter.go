@@ -3,6 +3,7 @@ package cog
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
@@ -19,7 +20,7 @@ const (
 	twitterQuotedNotFound = "Tweet does not quote any other tweet!"
 )
 
-var api twitter.API
+var api *twitter.API
 
 type TwitterCog struct {
 	DiscordBotCog
@@ -29,10 +30,13 @@ func (TwitterCog) String() string {
 	return "twitter"
 }
 
-func (c *TwitterCog) Setup(ctx context.Context, cfg *config.Config) error {
-	c.DiscordBotCog.Setup(c, cfg)
+func (c *TwitterCog) Setup(ctx context.Context, cfg *config.Config, wg *sync.WaitGroup) error {
+	c.DiscordBotCog.Setup(c, cfg, wg)
 	api = twitter.NewAPI(cfg.Twitter)
 	return nil
+}
+
+func (c *TwitterCog) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
 }
 
 func (TwitterCog) Commands() []Command {

@@ -41,7 +41,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cogs, err := cog.SetupCogs(ctx, cfg, logger)
+	cogs, err := cog.SetupCogs(ctx, cfg, &wg, logger)
 	if err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to load cogs")
 	}

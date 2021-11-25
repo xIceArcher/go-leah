@@ -43,6 +43,13 @@ discord:
         - photos
         - video
         - quoted
+    tweetstalk:
+      isAdminOnly: true
+      commands:
+        - stalk
+        - unstalk
+        - stalks
+        - color
     download:
       commands:
         - streamlink

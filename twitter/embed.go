@@ -27,7 +27,9 @@ func (t *Tweet) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 		IconURL: t.User.ProfileImageURL,
 	}
 
-	if len(t.PhotoURLs) > 1 {
+	if t.IsRetweet && len(t.RetweetedStatus.PhotoURLs) > 1 {
+		embeds = append(embeds, t.RetweetedStatus.GetPhotoEmbeds()[1:]...)
+	} else if len(t.PhotoURLs) > 1 {
 		embeds = append(embeds, t.GetPhotoEmbeds()[1:]...)
 	}
 
