@@ -2,6 +2,7 @@ package twitter
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -144,6 +145,10 @@ func (t *Tweet) GetTextWithEmbeds() string {
 
 		return finalURL
 	}, t.URLs...)
+
+	textWithEntities.AddByRegex(regexp.MustCompile(`&amp;`), func(s string) string { return "&" })
+	textWithEntities.AddByRegex(regexp.MustCompile(`&lt;`), func(s string) string { return "<" })
+	textWithEntities.AddByRegex(regexp.MustCompile(`&gt;`), func(s string) string { return ">" })
 
 	replacedText := textWithEntities.GetReplacedText(4096, -1)
 
