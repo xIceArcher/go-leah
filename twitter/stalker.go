@@ -49,6 +49,7 @@ func NewUserStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.Wai
 			tweet, err := api.GetTweet(t.IDStr)
 			if err != nil {
 				logger.With(zap.Error(err), zap.String("tweetID", t.IDStr)).Error("Failed to get tweet")
+				return
 			}
 
 			userStalker.OutCh <- tweet
