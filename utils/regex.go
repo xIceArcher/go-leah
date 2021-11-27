@@ -20,9 +20,9 @@ func (t *TextWithEntities) AddByRegex(regex *regexp.Regexp, f func(string) strin
 	}
 }
 
-func (t *TextWithEntities) AddEntity(f func(string) string, entities ...*Entity) {
+func (t *TextWithEntities) AddEntities(f func(*Entity) string, entities ...*Entity) {
 	for _, entity := range entities {
-		t.Entities = append(t.Entities, NewEntityWithReplacement(entity.start, entity.Match, f(entity.Match)))
+		t.Entities = append(t.Entities, NewEntityWithReplacement(entity.start, entity.Match, f(entity)))
 	}
 }
 

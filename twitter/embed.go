@@ -118,28 +118,28 @@ func (t *Tweet) GetTextWithEmbeds() string {
 
 	textWithEntities := utils.TextWithEntities{Text: t.Text}
 
-	textWithEntities.AddEntity(func(s string) string {
-		return utils.GetDiscordNamedLink(s, fmt.Sprintf("https://twitter.com/hashtag/%s", s[1:]))
+	textWithEntities.AddEntities(func(u *utils.Entity) string {
+		return utils.GetDiscordNamedLink(u.Match, fmt.Sprintf("https://twitter.com/hashtag/%s", u.Match[1:]))
 	}, t.Hashtags...)
 
-	textWithEntities.AddEntity(func(s string) string {
-		if t.IsReply && s[1:] == t.ReplyUser.Name {
+	textWithEntities.AddEntities(func(u *utils.Entity) string {
+		if t.IsReply && u.Match[1:] == t.ReplyUser.Name {
 			return ""
 		}
-		return utils.GetDiscordNamedLink(s, (&User{Name: s}).URL())
+		return utils.GetDiscordNamedLink(u.Match, (&User{Name: u.Match}).URL())
 	}, t.UserMentions...)
 
-	textWithEntities.AddEntity(func(s string) string {
+	textWithEntities.AddEntities(func(u *utils.Entity) string {
 		return ""
 	}, t.MediaLinks...)
 
-	textWithEntities.AddEntity(func(s string) string {
-		finalURL, err := utils.ExpandURL(s, expandIgnoreRegexes...)
+	textWithEntities.AddEntities(func(u *utils.Entity) string {
+		finalURL, err := utils.ExpandURL(u.Replacement, expandIgnoreRegexes...)
 		if err != nil {
-			return s
+			return u.Replacement
 		}
 
-		if t.IsQuoted && finalURL == t.QuotedStatus.URL() {
+		if t.IsQuoted && strings.EqualFold(finalURL, t.QuotedStatus.URL()) {
 			return ""
 		}
 

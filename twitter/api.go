@@ -135,7 +135,7 @@ func (a *API) parseTweet(tweet *twitter.Tweet) (*Tweet, error) {
 
 		for _, url := range tweet.Entities.Urls {
 			stringIdx := utils.GetStringIdx(runes, url.Indices.Start())
-			t.URLs = append(t.URLs, utils.NewEntity(stringIdx, url.URL))
+			t.URLs = append(t.URLs, utils.NewEntityWithReplacement(stringIdx, url.URL, url.ExpandedURL))
 		}
 	}
 
