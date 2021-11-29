@@ -123,7 +123,7 @@ func (t *Tweet) GetTextWithEmbeds() string {
 	}, t.Hashtags...)
 
 	textWithEntities.AddEntities(func(u *utils.Entity) string {
-		if t.IsReply && u.Match[1:] == t.ReplyUser.Name {
+		if t.IsReply && strings.EqualFold(u.Match[1:], t.ReplyUser.ScreenName) {
 			return ""
 		}
 		return utils.GetDiscordNamedLink(u.Match, (&User{Name: u.Match}).URL())
