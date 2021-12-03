@@ -27,7 +27,7 @@ var (
 )
 
 type TweetStalkManager struct {
-	stalker *twitter.UserStalker
+	stalker twitter.Stalker
 	api     *twitter.API
 
 	session *discordgo.Session
@@ -46,7 +46,7 @@ func NewTweetStalkManager(ctx context.Context, cfg *config.Config, session *disc
 	}
 
 	stalkManager := &TweetStalkManager{
-		stalker: twitter.NewUserStalker(ctx, cfg.Twitter, wg, logger),
+		stalker: twitter.NewStreamStalker(ctx, cfg.Twitter, wg, logger),
 		api:     twitter.NewAPI(cfg.Twitter),
 		session: session,
 		logger:  logger,
@@ -56,7 +56,7 @@ func NewTweetStalkManager(ctx context.Context, cfg *config.Config, session *disc
 		channelsToEmbeds: make(map[string]map[string]*utils.UpdatableEmbeds),
 	}
 
-	go stalkManager.HandleTweets(stalkManager.stalker.OutCh)
+	go stalkManager.HandleTweets(stalkManager.stalker.OutCh())
 	return stalkManager
 }
 
@@ -221,7 +221,7 @@ func (t *TweetStalkManager) Color(ctx context.Context, channelID string, screenN
 	return t.cache.SetKeepTTL(ctx, t.getCacheKey(channelID, user.ID), color)
 }
 
-func (t *TweetStalkManager) HandleTweets(ch chan *twitter.Tweet) {
+func (t *TweetStalkManager) HandleTweets(ch <-chan *twitter.Tweet) {
 	for tweet := range ch {
 		if channelIDs, ok := t.userToChannels[tweet.User.ID]; ok {
 			logger := t.logger.With(zap.String("tweetURL", tweet.URL()))
