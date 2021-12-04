@@ -258,8 +258,8 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 		wg.Wait()
 	}()
 
-	downloadedRuns := make(map[int]map[int]string)
-	downloadedRuns[currRunNo] = make(map[int]string)
+	downloadedRuns := make([]map[int]string, 0)
+	downloadedRuns = append(downloadedRuns, make(map[int]string))
 
 	doneCh := make(chan int, 1)
 
@@ -340,7 +340,7 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 						}
 
 						currRunNo++
-						downloadedRuns[currRunNo] = make(map[int]string)
+						downloadedRuns = append(downloadedRuns, make(map[int]string))
 					}
 
 					var iv []byte
