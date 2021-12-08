@@ -243,3 +243,68 @@ func (a *API) parseUser(u *twitter.User) (*User, error) {
 		ProfileImageURL: u.ProfileImageURLHttps,
 	}, nil
 }
+
+func (a *API) GetUserTimeline(id string, sinceID string) (ret []*Tweet, err error) {
+	idInt, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	sinceIDInt, err := strconv.ParseInt(sinceID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	tweets, resp, err := api.Timelines.UserTimeline(&twitter.UserTimelineParams{
+		UserID:          idInt,
+		SinceID:         sinceIDInt,
+		TrimUser:        twitter.Bool(false),
+		ExcludeReplies:  twitter.Bool(false),
+		IncludeRetweets: twitter.Bool(true),
+		TweetMode:       tweetModeExtended,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	for _, tweet := range tweets {
+		t, err := a.parseTweet(&tweet)
+		if err != nil {
+			return nil, err
+		}
+
+		ret = append(ret, t)
+	}
+
+	return ret, nil
+}
+
+func (a *API) GetLastTweetID(userID string) (tweetID string, err error) {
+	idInt, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		return "", err
+	}
+
+	tweets, resp, err := api.Timelines.UserTimeline(&twitter.UserTimelineParams{
+		UserID:          idInt,
+		Count:           5,
+		TrimUser:        twitter.Bool(false),
+		ExcludeReplies:  twitter.Bool(false),
+		IncludeRetweets: twitter.Bool(true),
+		TweetMode:       tweetModeExtended,
+	})
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return "", ErrNotFound
+	}
+	if len(tweets) == 0 {
+		return "", ErrNotFound
+	}
+
+	return tweets[0].IDStr, nil
+}

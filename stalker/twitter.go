@@ -46,7 +46,7 @@ func NewTweetStalkManager(ctx context.Context, cfg *config.Config, session *disc
 	}
 
 	stalkManager := &TweetStalkManager{
-		stalker: twitter.NewStreamStalker(ctx, cfg.Twitter, wg, logger),
+		stalker: twitter.NewPollStalker(ctx, cfg.Twitter, wg, logger),
 		api:     twitter.NewAPI(cfg.Twitter),
 		session: session,
 		logger:  logger,

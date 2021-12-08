@@ -26,6 +26,7 @@ type TwitterConfig struct {
 	AccessToken    string `yaml:"accessToken"`
 	AccessSecret   string `yaml:"accessSecret"`
 
+	PollIntervalMins        int      `yaml:"pollIntervalMins"`
 	MaxStreamRestartRetries int      `yaml:"maxStreamRestartRetries"`
 	ExpandIgnoreRegexes     []string `yaml:"expandIgnoreRegexes"`
 }
