@@ -52,8 +52,7 @@ func NewStreamStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.W
 		streamStalker.demux.StreamDisconnect = func(disconnect *twitter.StreamDisconnect) {
 			logger.With(zap.String("reason", disconnect.Reason)).Warn("Stream crashed")
 
-			streamStalker.restartCh <- 1
-			if err := <-streamStalker.restartErrCh; err != nil {
+			if err := streamStalker.twitterStalker.Restart(); err != nil {
 				streamStalker.logger.With(zap.Error(err)).Error("Stream crashed and cannot be recovered")
 			}
 		}

@@ -5,6 +5,7 @@ import "go.uber.org/zap"
 type Stalker interface {
 	AddUsers(userIDs ...string) error
 	RemoveUsers(userIDs ...string) error
+	Restart() error
 	IsStalkingUser(userID string) bool
 
 	OutCh() <-chan *Tweet
@@ -44,8 +45,7 @@ func (s *twitterStalker) AddUsers(userIDs ...string) error {
 	}
 
 	if shouldRestart {
-		s.restartCh <- 1
-		return <-s.restartErrCh
+		s.Restart()
 	}
 
 	return nil
@@ -63,11 +63,15 @@ func (s *twitterStalker) RemoveUsers(userIDs ...string) error {
 	}
 
 	if shouldRestart {
-		s.restartCh <- 1
-		return <-s.restartErrCh
+		s.Restart()
 	}
 
 	return nil
+}
+
+func (s *twitterStalker) Restart() error {
+	s.restartCh <- 1
+	return <-s.restartErrCh
 }
 
 func (s *twitterStalker) IsStalkingUser(userID string) bool {

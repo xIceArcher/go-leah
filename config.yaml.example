@@ -4,6 +4,10 @@ twitter:
   accessToken:
   accessSecret:
 
+  maxStreamRestartRetries: 5
+  pollIntervalMins: 5
+  stalkerTimeoutMins: 15
+
   expandIgnoreRegexes:
     # Don't ever display these URLs, stop redirecting and use the previous useful link instead
     - 'http[s]?://(?:w{3}\.)?instagram\.com/accounts/login'
