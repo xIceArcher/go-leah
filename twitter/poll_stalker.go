@@ -105,6 +105,10 @@ func (s *PollStalker) PollTask(ctx context.Context, userID string, sinceID strin
 				continue
 			}
 
+			if len(tweets) == 0 {
+				continue
+			}
+
 			for i := len(tweets) - 1; i >= 0; i-- {
 				s.outCh <- tweets[i]
 			}
