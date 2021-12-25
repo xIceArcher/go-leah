@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/xIceArcher/go-leah/cache"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/twitter"
 	"github.com/xIceArcher/go-leah/utils"
@@ -20,7 +21,7 @@ const (
 	twitterQuotedNotFound = "Tweet does not quote any other tweet!"
 )
 
-var api *twitter.API
+var api twitter.API
 
 type TwitterCog struct {
 	DiscordBotCog
@@ -32,7 +33,13 @@ func (TwitterCog) String() string {
 
 func (c *TwitterCog) Setup(ctx context.Context, cfg *config.Config, wg *sync.WaitGroup) error {
 	c.DiscordBotCog.Setup(c, cfg, wg)
-	api = twitter.NewAPI(cfg.Twitter)
+
+	cache, err := cache.NewRedisCache(cfg.Redis)
+	if err != nil {
+		return err
+	}
+
+	api = twitter.NewCachedAPI(cfg.Twitter, cache, zap.S())
 	return nil
 }
 

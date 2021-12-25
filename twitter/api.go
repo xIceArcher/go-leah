@@ -1,6 +1,8 @@
 package twitter
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
+	"github.com/xIceArcher/go-leah/cache"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/utils"
 	"go.uber.org/zap"
@@ -20,10 +23,82 @@ const (
 	tweetModeExtended = "extended"
 )
 
+const (
+	CacheKeyTwitterAPITweetFormat = "go-leah/twitterAPI/tweet/%s"
+)
+
 var URLRegex *regexp.Regexp = regexp.MustCompile(`(?:http[s]?://)?twitter\.com/[^/]*/status/([0-9]*)(?:\?[^ \r\n]*)?`)
 var ErrNotFound = errors.New("resource not found")
 
-type API struct{}
+type API interface {
+	GetTweet(id string) (*Tweet, error)
+
+	GetUser(id string) (*User, error)
+	GetUserByScreenName(screenName string) (*User, error)
+	GetUserTimeline(id string, sinceID string) ([]*Tweet, error)
+	GetLastTweetID(userID string) (tweetID string, err error)
+}
+
+type CachedAPI struct {
+	*BaseAPI
+
+	cache  cache.Cache
+	logger *zap.SugaredLogger
+}
+
+func NewCachedAPI(cfg *config.TwitterConfig, c cache.Cache, logger *zap.SugaredLogger) API {
+	_ = NewBaseAPI(cfg)
+
+	return &CachedAPI{
+		BaseAPI: &BaseAPI{},
+
+		cache:  c,
+		logger: logger,
+	}
+}
+
+func (a *CachedAPI) GetTweet(id string) (*Tweet, error) {
+	cacheKey := fmt.Sprintf(CacheKeyTwitterAPITweetFormat, id)
+	logger := a.logger.With(zap.String("cacheKey", cacheKey))
+
+	if tweet, err := func() (tweet *Tweet, err error) {
+		val, err := a.cache.Get(context.Background(), cacheKey)
+		if err != nil {
+			return nil, err
+		}
+
+		valStr, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("unknown cache return type %T", val)
+		}
+
+		tweet = &Tweet{}
+		err = json.Unmarshal([]byte(valStr), tweet)
+		return
+	}(); err == nil {
+		return tweet, nil
+	}
+
+	tweet, err := a.BaseAPI.GetTweet(id)
+	if err != nil {
+		return nil, err
+	}
+
+	tweetBytes, err := json.Marshal(tweet)
+	if err != nil {
+		// This error only affects caching, ignore and return the result
+		logger.With(zap.Error(err)).Warn("Failed to marshal tweet")
+		return tweet, nil
+	}
+
+	if err := a.cache.SetWithExpiry(context.Background(), cacheKey, tweetBytes, 4*time.Minute); err != nil {
+		logger.With(zap.Error(err)).Warn("Failed to set cache")
+	}
+
+	return tweet, nil
+}
+
+type BaseAPI struct{}
 
 var (
 	api                 *twitter.Client
@@ -32,7 +107,7 @@ var (
 	apiSetupOnce sync.Once
 )
 
-func NewAPI(cfg *config.TwitterConfig) *API {
+func NewBaseAPI(cfg *config.TwitterConfig) *BaseAPI {
 	apiSetupOnce.Do(func() {
 		config := oauth1.NewConfig(cfg.ConsumerKey, cfg.ConsumerSecret)
 		token := oauth1.NewToken(cfg.AccessToken, cfg.AccessSecret)
@@ -52,10 +127,10 @@ func NewAPI(cfg *config.TwitterConfig) *API {
 
 	})
 
-	return &API{}
+	return &BaseAPI{}
 }
 
-func (a *API) GetTweet(id string) (*Tweet, error) {
+func (a *BaseAPI) GetTweet(id string) (*Tweet, error) {
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return nil, err
@@ -79,7 +154,7 @@ func (a *API) GetTweet(id string) (*Tweet, error) {
 	return t, nil
 }
 
-func (a *API) parseTweet(tweet *twitter.Tweet) (*Tweet, error) {
+func (a *BaseAPI) parseTweet(tweet *twitter.Tweet) (*Tweet, error) {
 	timestamp, err := time.Parse(time.RubyDate, tweet.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -166,7 +241,7 @@ func (a *API) parseTweet(tweet *twitter.Tweet) (*Tweet, error) {
 	return t, nil
 }
 
-func (a *API) getPhotoURLs(tweet *twitter.Tweet) (photoURLs []string) {
+func (a *BaseAPI) getPhotoURLs(tweet *twitter.Tweet) (photoURLs []string) {
 	if tweet.ExtendedEntities == nil {
 		return
 	}
@@ -180,7 +255,7 @@ func (a *API) getPhotoURLs(tweet *twitter.Tweet) (photoURLs []string) {
 	return photoURLs
 }
 
-func (a *API) getVideoURL(tweet *twitter.Tweet) (videoURL string) {
+func (a *BaseAPI) getVideoURL(tweet *twitter.Tweet) (videoURL string) {
 	if tweet.ExtendedEntities == nil {
 		return
 	}
@@ -203,7 +278,7 @@ func (a *API) getVideoURL(tweet *twitter.Tweet) (videoURL string) {
 	return maxUrl
 }
 
-func (a *API) GetUser(id string) (*User, error) {
+func (a *BaseAPI) GetUser(id string) (*User, error) {
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return nil, err
@@ -221,7 +296,7 @@ func (a *API) GetUser(id string) (*User, error) {
 	return a.parseUser(user)
 }
 
-func (a *API) GetUserByScreenName(screenName string) (*User, error) {
+func (a *BaseAPI) GetUserByScreenName(screenName string) (*User, error) {
 	user, resp, err := api.Users.Show(&twitter.UserShowParams{
 		ScreenName: screenName,
 	})
@@ -235,7 +310,7 @@ func (a *API) GetUserByScreenName(screenName string) (*User, error) {
 	return a.parseUser(user)
 }
 
-func (a *API) parseUser(u *twitter.User) (*User, error) {
+func (a *BaseAPI) parseUser(u *twitter.User) (*User, error) {
 	return &User{
 		ID:              u.IDStr,
 		Name:            u.Name,
@@ -244,7 +319,7 @@ func (a *API) parseUser(u *twitter.User) (*User, error) {
 	}, nil
 }
 
-func (a *API) GetUserTimeline(id string, sinceID string) (ret []*Tweet, err error) {
+func (a *BaseAPI) GetUserTimeline(id string, sinceID string) (ret []*Tweet, err error) {
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return nil, err
@@ -282,7 +357,7 @@ func (a *API) GetUserTimeline(id string, sinceID string) (ret []*Tweet, err erro
 	return ret, nil
 }
 
-func (a *API) GetLastTweetID(userID string) (tweetID string, err error) {
+func (a *BaseAPI) GetLastTweetID(userID string) (tweetID string, err error) {
 	idInt, err := strconv.ParseInt(userID, 10, 64)
 	if err != nil {
 		return "", err

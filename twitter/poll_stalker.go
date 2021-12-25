@@ -13,13 +13,13 @@ type PollStalker struct {
 	*twitterStalker
 
 	ctx            context.Context
-	api            *API
+	api            API
 	userCancelFunc map[string]context.CancelFunc
 
 	PollInterval time.Duration
 }
 
-func NewPollStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.WaitGroup, logger *zap.SugaredLogger) *PollStalker {
+func NewPollStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.WaitGroup, api API, logger *zap.SugaredLogger) *PollStalker {
 	pollIntervalMins := cfg.PollIntervalMins
 	if cfg.PollIntervalMins == 0 {
 		pollIntervalMins = 5
@@ -29,7 +29,7 @@ func NewPollStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.Wai
 		twitterStalker: newTwitterStalker(logger),
 
 		ctx:            ctx,
-		api:            NewAPI(cfg),
+		api:            api,
 		userCancelFunc: make(map[string]context.CancelFunc),
 
 		PollInterval: time.Duration(pollIntervalMins) * time.Minute,

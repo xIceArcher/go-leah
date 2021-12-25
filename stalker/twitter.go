@@ -28,7 +28,7 @@ var (
 
 type TweetStalkManager struct {
 	stalker twitter.Stalker
-	api     *twitter.API
+	api     twitter.API
 
 	session *discordgo.Session
 	logger  *zap.SugaredLogger
@@ -45,12 +45,14 @@ func NewTweetStalkManager(ctx context.Context, cfg *config.Config, session *disc
 		logger.With(zap.Error(err)).Error("Failed to initialize cache, stalks will only be saved in-memory")
 	}
 
-	streamStalker := twitter.NewStreamStalker(ctx, cfg.Twitter, wg, logger)
-	pollStalker := twitter.NewPollStalker(ctx, cfg.Twitter, wg, logger)
+	api := twitter.NewCachedAPI(cfg.Twitter, cache, logger)
+
+	streamStalker := twitter.NewStreamStalker(ctx, cfg.Twitter, wg, api, logger)
+	pollStalker := twitter.NewPollStalker(ctx, cfg.Twitter, wg, api, logger)
 
 	stalkManager := &TweetStalkManager{
 		stalker: twitter.NewCombinedStalker(ctx, cfg.Twitter, []twitter.Stalker{streamStalker, pollStalker}, logger),
-		api:     twitter.NewAPI(cfg.Twitter),
+		api:     api,
 		session: session,
 		logger:  logger,
 		cache:   cache,

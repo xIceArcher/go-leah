@@ -24,9 +24,7 @@ var (
 	streamStalkerSetupOnce sync.Once
 )
 
-func NewStreamStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.WaitGroup, logger *zap.SugaredLogger) *StreamStalker {
-	api := NewAPI(cfg)
-
+func NewStreamStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.WaitGroup, api API, logger *zap.SugaredLogger) *StreamStalker {
 	streamStalkerSetupOnce.Do(func() {
 		streamStalker = &StreamStalker{
 			twitterStalker: newTwitterStalker(logger),
