@@ -74,6 +74,7 @@ func (a *CachedYoutubeAPI) GetVideo(ctx context.Context, id string, parts []stri
 			return nil, fmt.Errorf("unknown cache return type %T", val)
 		}
 
+		video = &Video{}
 		err = json.Unmarshal([]byte(valStr), video)
 		return
 	}(); err == nil {
