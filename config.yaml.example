@@ -69,6 +69,10 @@ discord:
     twitchLiveStream:
       regexes:
         - http[s]?://(?:w{3}\.)?twitch.tv/([A-Za-z0-9_]*)
+    twitterSpace:
+      regexes:
+        - 'http[s]?://(?:w{3}\.)?twitter.com/i/spaces/([A-Za-z0-9_]*)'
+
   filterRegexes:
     - '<.*>'                                # Surpressed
     - '\|\|[^\|]+\|\|'                      # Spoilers

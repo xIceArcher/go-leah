@@ -11,6 +11,11 @@ import (
 	"github.com/xIceArcher/go-leah/utils"
 )
 
+var twitterEmbedFooter = &discordgo.MessageEmbedFooter{
+	Text:    "Twitter",
+	IconURL: "https://abs.twimg.com/icons/apple-touch-icon-192x192.png",
+}
+
 func (t *Tweet) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 	if t.IsReply {
 		embeds = append(embeds, t.replyMainEmbed())
@@ -22,11 +27,7 @@ func (t *Tweet) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 		embeds = append(embeds, t.standardMainEmbed())
 	}
 
-	embeds[0].Author = &discordgo.MessageEmbedAuthor{
-		Name:    fmt.Sprintf("%s (@%s)", t.User.Name, t.User.ScreenName),
-		URL:     t.User.URL(),
-		IconURL: t.User.ProfileImageURL,
-	}
+	embeds[0].Author = t.User.GetEmbed()
 
 	if t.IsRetweet && len(t.RetweetedStatus.PhotoURLs) > 1 {
 		embeds = append(embeds, t.RetweetedStatus.GetPhotoEmbeds()[1:]...)
@@ -34,10 +35,7 @@ func (t *Tweet) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 		embeds = append(embeds, t.GetPhotoEmbeds()[1:]...)
 	}
 
-	embeds[len(embeds)-1].Footer = &discordgo.MessageEmbedFooter{
-		Text:    "Twitter",
-		IconURL: "https://abs.twimg.com/icons/apple-touch-icon-192x192.png",
-	}
+	embeds[len(embeds)-1].Footer = twitterEmbedFooter
 	embeds[len(embeds)-1].Timestamp = t.Timestamp.Format(time.RFC3339)
 
 	return embeds
@@ -153,4 +151,53 @@ func (t *Tweet) GetTextWithEmbeds() string {
 	replacedText := textWithEntities.GetReplacedText(4096, -1)
 
 	return strings.TrimSpace(replacedText[0])
+}
+
+func (u *User) GetEmbed() *discordgo.MessageEmbedAuthor {
+	return &discordgo.MessageEmbedAuthor{
+		Name:    fmt.Sprintf("%s (@%s)", u.Name, u.ScreenName),
+		URL:     u.URL(),
+		IconURL: u.ProfileImageURL,
+	}
+}
+
+func (s *Space) GetEmbed() *discordgo.MessageEmbed {
+	var color string
+	fields := make([]*discordgo.MessageEmbedField, 0)
+
+	if s.State == SpaceStateLive {
+		color = consts.ColorTwitter
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "Started",
+			Value:  utils.FormatDiscordRelativeTime(s.StartTime),
+			Inline: true,
+		})
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "Participants",
+			Value:  fmt.Sprint(s.ParticipantCount),
+			Inline: true,
+		})
+	} else {
+		color = consts.ColorNone
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "Ended",
+			Value:  utils.FormatDiscordRelativeTime(s.EndTime),
+			Inline: true,
+		})
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "Duration",
+			Value:  utils.FormatDurationSimple(s.EndTime.Sub(s.StartTime)),
+			Inline: true,
+		})
+	}
+
+	return &discordgo.MessageEmbed{
+		URL:       s.URL(),
+		Title:     s.Title,
+		Author:    s.Creator.GetEmbed(),
+		Timestamp: s.StartTime.Format(time.RFC3339),
+		Fields:    fields,
+		Color:     utils.ParseHexColor(color),
+		Footer:    twitterEmbedFooter,
+	}
 }

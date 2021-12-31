@@ -29,7 +29,7 @@ require (
 	go.uber.org/zap v1.19.1
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/net v0.0.0-20211029224645-99673261e6eb // indirect
-	golang.org/x/oauth2 v0.0.0-20211028175245-ba495a64dcb5 // indirect
+	golang.org/x/oauth2 v0.0.0-20211028175245-ba495a64dcb5
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20211029165221-6e7872819dc8 // indirect
 	golang.org/x/text v0.3.7 // indirect

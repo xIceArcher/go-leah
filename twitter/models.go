@@ -61,3 +61,26 @@ type User struct {
 func (u *User) URL() string {
 	return fmt.Sprintf("https://twitter.com/%s", u.ScreenName)
 }
+
+type SpaceState string
+
+const (
+	SpaceStateLive  SpaceState = "live"
+	SpaceStateEnded SpaceState = "ended"
+)
+
+type Space struct {
+	ID    string
+	Title string
+	State SpaceState
+
+	Creator          *User
+	ParticipantCount int
+
+	StartTime time.Time
+	EndTime   time.Time
+}
+
+func (s *Space) URL() string {
+	return fmt.Sprintf("https://twitter.com/i/spaces/%s", s.ID)
+}

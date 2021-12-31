@@ -13,14 +13,19 @@ import (
 
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
+	"github.com/go-resty/resty/v2"
 	"github.com/xIceArcher/go-leah/cache"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/utils"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
 const (
 	tweetModeExtended = "extended"
+
+	v2APIBaseURL     = "https://api.twitter.com/2"
+	v2APIGetSpaceURL = v2APIBaseURL + "/spaces"
 )
 
 const (
@@ -37,6 +42,7 @@ type API interface {
 	GetUserByScreenName(screenName string) (*User, error)
 	GetUserTimeline(id string, sinceID string) ([]*Tweet, error)
 	GetLastTweetID(userID string) (tweetID string, err error)
+	GetSpace(spaceID string) (*Space, error)
 }
 
 type CachedAPI struct {
@@ -102,6 +108,7 @@ type BaseAPI struct{}
 
 var (
 	api                 *twitter.Client
+	apiV2Client         *resty.Client
 	expandIgnoreRegexes []*regexp.Regexp
 
 	apiSetupOnce sync.Once
@@ -112,8 +119,14 @@ func NewBaseAPI(cfg *config.TwitterConfig) *BaseAPI {
 		config := oauth1.NewConfig(cfg.ConsumerKey, cfg.ConsumerSecret)
 		token := oauth1.NewToken(cfg.AccessToken, cfg.AccessSecret)
 		httpClient := config.Client(oauth1.NoContext, token)
-
 		api = twitter.NewClient(httpClient)
+
+		v2Config := clientcredentials.Config{
+			ClientID:     cfg.ConsumerKey,
+			ClientSecret: cfg.ConsumerSecret,
+			TokenURL:     "https://api.twitter.com/oauth2/token",
+		}
+		apiV2Client = resty.NewWithClient(v2Config.Client(context.Background()))
 
 		for _, r := range cfg.ExpandIgnoreRegexes {
 			regex, err := regexp.Compile(r)
@@ -382,4 +395,25 @@ func (a *BaseAPI) GetLastTweetID(userID string) (tweetID string, err error) {
 	}
 
 	return tweets[0].IDStr, nil
+}
+
+func (a *BaseAPI) GetSpace(spaceID string) (*Space, error) {
+	resp := &getSpaceResponse{}
+	_, err := apiV2Client.R().
+		SetQueryParams(map[string]string{
+			"space.fields": "started_at,ended_at,title,participant_count",
+			"expansions":   "creator_id",
+			"user.fields":  "profile_image_url",
+		}).
+		SetResult(resp).
+		Get(v2APIGetSpaceURL + "/" + spaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf(resp.Errors[0].Detail)
+	}
+
+	return resp.toDTO(), nil
 }
