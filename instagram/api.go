@@ -15,14 +15,16 @@ import (
 type API struct{}
 
 var (
-	instaURLFormat string
-	client         *http.Client
-	apiSetupOnce   sync.Once
+	instaPostURLFormat  string
+	instaStoryURLFormat string
+	client              *http.Client
+	apiSetupOnce        sync.Once
 )
 
 func NewAPI(cfg *config.InstaConfig) (*API, error) {
 	apiSetupOnce.Do(func() {
-		instaURLFormat = cfg.PostURLFormat
+		instaPostURLFormat = cfg.PostURLFormat
+		instaStoryURLFormat = cfg.StoryURLFormat
 		client = &http.Client{
 			Timeout: 10 * time.Second,
 		}
@@ -32,7 +34,7 @@ func NewAPI(cfg *config.InstaConfig) (*API, error) {
 }
 
 func (API) GetPost(shortcode string) (*Post, error) {
-	resp, err := client.Get(fmt.Sprintf(instaURLFormat, shortcode))
+	resp, err := client.Get(fmt.Sprintf(instaPostURLFormat, shortcode))
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +49,7 @@ func (API) GetPost(shortcode string) (*Post, error) {
 		return nil, err
 	}
 
-	rawResp := RawResp{}
+	rawResp := RawPostResp{}
 	if err := json.Unmarshal(body, &rawResp); err != nil {
 		return nil, err
 	}
@@ -77,6 +79,57 @@ func (API) GetPost(shortcode string) (*Post, error) {
 
 		PhotoURLs: rawPost.extractPhotoURLs(),
 		VideoURLs: rawPost.extractVideoURLs(),
+	}, nil
+}
+
+func (API) GetStory(username string) (*Story, error) {
+	resp, err := client.Get(fmt.Sprintf(instaStoryURLFormat, username))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("http error %v", resp.StatusCode)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	rawResp := RawReel{}
+	if err := json.Unmarshal(body, &rawResp); err != nil {
+		return nil, err
+	}
+
+	if len(rawResp.ReelMedia) == 0 {
+		return nil, errors.New("failed to get stories")
+	}
+
+	latestReelIdx := 0
+	for i, reel := range rawResp.ReelMedia {
+		if reel.TakenAtTimestamp > rawResp.ReelMedia[latestReelIdx].TakenAtTimestamp {
+			latestReelIdx = i
+		}
+	}
+	rawReel := rawResp.ReelMedia[latestReelIdx]
+
+	fullName := rawResp.User.FullName
+	if fullName == "" {
+		fullName = rawResp.User.Username
+	}
+
+	return &Story{
+		Owner: &User{
+			Username:      rawResp.User.Username,
+			Fullname:      fullName,
+			ProfilePicURL: rawResp.User.ProfilePicURL,
+		},
+
+		Timestamp: time.Unix(rawReel.TakenAtTimestamp, 0),
+		MediaURL:  rawReel.extractMediaURL(),
+		MediaType: rawReel.MediaType,
 	}, nil
 }
 

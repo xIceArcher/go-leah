@@ -130,3 +130,77 @@ func (h *InstagramPostHandler) Handle(ctx context.Context, session *discordgo.Se
 
 	return shortcodes, nil
 }
+
+type InstagramStoryHandler struct {
+	api *instagram.API
+
+	RegexManager
+}
+
+func (InstagramStoryHandler) String() string {
+	return "instagramStory"
+}
+
+func (h *InstagramStoryHandler) Setup(ctx context.Context, cfg *config.Config, regexes []*regexp.Regexp, wg *sync.WaitGroup) (err error) {
+	h.Regexes = regexes
+	h.api, err = instagram.NewAPI(cfg.Instagram)
+	return err
+}
+
+func (h *InstagramStoryHandler) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
+}
+
+func (h *InstagramStoryHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (usernames []string, err error) {
+	usernames = h.Match(msg)
+
+	for _, username := range usernames {
+		logger := logger.With(
+			zap.String("username", username),
+		)
+
+		story, err := h.api.GetStory(username)
+		if err != nil {
+			logger.With(zap.Error(err)).Error("Get story")
+			continue
+		}
+
+		embed := &discordgo.MessageEmbed{
+			URL:   story.URL(),
+			Title: fmt.Sprintf("Instagram story by %s", story.Owner.Fullname),
+			Author: &discordgo.MessageEmbedAuthor{
+				Name:    fmt.Sprintf("%s (%s)", story.Owner.Fullname, story.Owner.Username),
+				URL:     story.Owner.URL(),
+				IconURL: story.Owner.ProfilePicURL,
+			},
+			Color: utils.ParseHexColor(consts.ColorInsta),
+			Footer: &discordgo.MessageEmbedFooter{
+				Text:    "Instagram",
+				IconURL: "https://instagram-brand.com/wp-content/uploads/2016/11/Instagram_AppIcon_Aug2017.png?w=300",
+			},
+			Timestamp: story.Timestamp.Format(time.RFC3339),
+		}
+
+		baseMessage := &discordgo.MessageSend{
+			Embed: embed,
+		}
+
+		if story.IsImage() {
+			utils.DownloadAndAttachImage(baseMessage, story.MediaURL, username)
+		}
+
+		if _, err = session.ChannelMessageSendComplex(channelID, baseMessage); err != nil {
+			logger.With(zap.Error(err)).Error("Send story embed")
+			continue
+		}
+
+		if story.IsVideo() {
+			videoMessage := utils.DownloadVideo(story.MediaURL, username)
+			if _, err = session.ChannelMessageSendComplex(channelID, videoMessage); err != nil {
+				logger.With(zap.Error(err)).Error("Send post video")
+				continue
+			}
+		}
+	}
+
+	return usernames, nil
+}

@@ -12,6 +12,56 @@ func GetDiscordNamedLink(text string, url string) string {
 	return fmt.Sprintf("[%s](%s)", text, url)
 }
 
+func DownloadAndAttachImage(message *discordgo.MessageSend, url string, fileName string) {
+	file, _, err := Download(url, int64(consts.DiscordMessageMaxBytes))
+	if err != nil {
+		message.Embed.Image = &discordgo.MessageEmbedImage{
+			URL: url,
+		}
+		return
+	}
+
+	message.Files = []*discordgo.File{
+		{
+			Name:        fmt.Sprintf("%s.jpg", fileName),
+			ContentType: "image/jpeg",
+			Reader:      file,
+		},
+	}
+
+	if len(message.Embeds) == 0 {
+		if message.Embed != nil {
+			message.Embeds = append(message.Embeds, message.Embed)
+			message.Embed = nil
+		} else {
+			message.Embeds = append(message.Embeds, &discordgo.MessageEmbed{})
+		}
+	}
+
+	message.Embeds[0].Image = &discordgo.MessageEmbedImage{
+		URL: fmt.Sprintf("attachment://%s.jpg", fileName),
+	}
+}
+
+func DownloadVideo(url string, fileName string) *discordgo.MessageSend {
+	file, _, err := Download(url, int64(consts.DiscordMessageMaxBytes))
+	if err != nil {
+		return &discordgo.MessageSend{
+			Content: url,
+		}
+	}
+
+	return &discordgo.MessageSend{
+		Files: []*discordgo.File{
+			{
+				Name:        fmt.Sprintf("%s.mp4", fileName),
+				ContentType: "video/mp4",
+				Reader:      file,
+			},
+		},
+	}
+}
+
 func SplitVideos(urls []string, fileNamePrefix string) (messages []*discordgo.MessageSend) {
 	maxBytes := int64(consts.DiscordMessageMaxBytes)
 

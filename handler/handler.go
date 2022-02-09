@@ -22,6 +22,7 @@ type Handler interface {
 var implementedHandlers []Handler = []Handler{
 	&YoutubeLiveStreamHandler{},
 	&InstagramPostHandler{},
+	&InstagramStoryHandler{},
 	&TwitchLiveStreamHandler{},
 	&TwitterSpaceHandler{},
 }

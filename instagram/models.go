@@ -5,7 +5,14 @@ import (
 	"time"
 )
 
-type RawResp struct {
+type MediaType int
+
+const (
+	MediaTypeImage MediaType = 1
+	MediaTypeVideo MediaType = 2
+)
+
+type RawPostResp struct {
 	Items []RawPost `json:"items"`
 }
 
@@ -27,6 +34,13 @@ type RawPost struct {
 	TakenAtTimestamp int64 `json:"taken_at"`
 }
 
+type RawReel struct {
+	ID   int64   `json:"id"`
+	User RawUser `json:"user"`
+
+	ReelMedia []*RawReelMedia `json:"items"`
+}
+
 type RawUser struct {
 	Username      string `json:"username"`
 	FullName      string `json:"full_name"`
@@ -40,6 +54,13 @@ type RawCarouselMedia struct {
 
 func (m *RawCarouselMedia) IsVideo() bool {
 	return len(m.VideoVersions) > 0
+}
+
+type RawReelMedia struct {
+	ImageVersions    *RawImageVersions `json:"image_versions2"`
+	VideoVersions    []*RawVideo       `json:"video_versions"`
+	MediaType        MediaType         `json:"media_type"`
+	TakenAtTimestamp int64             `json:"taken_at"`
 }
 
 type RawImageVersions struct {
@@ -74,7 +95,7 @@ func (p *RawPost) extractPhotoURLs() []string {
 
 		currBestIdx := 0
 		for i, image := range media.ImageVersions.Candidates {
-			if image.Width*image.Height > media.ImageVersions.Candidates[i].Width*media.ImageVersions.Candidates[i].Height {
+			if image.Width*image.Height > media.ImageVersions.Candidates[currBestIdx].Width*media.ImageVersions.Candidates[currBestIdx].Height {
 				currBestIdx = i
 			}
 		}
@@ -101,7 +122,7 @@ func (p *RawPost) extractVideoURLs() []string {
 
 		currBestIdx := 0
 		for i, video := range media.VideoVersions {
-			if video.Width*video.Height > media.VideoVersions[i].Width*media.VideoVersions[i].Height {
+			if video.Width*video.Height > media.VideoVersions[currBestIdx].Width*media.VideoVersions[currBestIdx].Height {
 				currBestIdx = i
 			}
 		}
@@ -110,6 +131,38 @@ func (p *RawPost) extractVideoURLs() []string {
 	}
 
 	return videoURLs
+}
+
+func (r *RawReelMedia) extractMediaURL() string {
+	if r.MediaType == MediaTypeImage {
+		return r.extractBestImageURL()
+	} else if r.MediaType == MediaTypeVideo {
+		return r.extractBestVideoURL()
+	} else {
+		return ""
+	}
+}
+
+func (r *RawReelMedia) extractBestImageURL() string {
+	currBestIdx := 0
+	for i, image := range r.ImageVersions.Candidates {
+		if image.Width*image.Height > r.ImageVersions.Candidates[currBestIdx].Width*r.ImageVersions.Candidates[currBestIdx].Height {
+			currBestIdx = i
+		}
+	}
+
+	return r.ImageVersions.Candidates[currBestIdx].URL
+}
+
+func (r *RawReelMedia) extractBestVideoURL() string {
+	currBestIdx := 0
+	for i, video := range r.VideoVersions {
+		if video.Width*video.Height > r.VideoVersions[currBestIdx].Width*r.VideoVersions[currBestIdx].Height {
+			currBestIdx = i
+		}
+	}
+
+	return r.VideoVersions[currBestIdx].URL
 }
 
 type User struct {
@@ -136,4 +189,23 @@ type Post struct {
 
 func (p *Post) URL() string {
 	return fmt.Sprintf("https://instagram.com/p/%s", p.Shortcode)
+}
+
+type Story struct {
+	Owner     *User
+	Timestamp time.Time
+	MediaURL  string
+	MediaType MediaType
+}
+
+func (s *Story) URL() string {
+	return fmt.Sprintf("https://www.instagram.com/stories/%s", s.Owner.Username)
+}
+
+func (s *Story) IsImage() bool {
+	return s.MediaType == MediaTypeImage
+}
+
+func (s *Story) IsVideo() bool {
+	return s.MediaType == MediaTypeVideo
 }
