@@ -22,6 +22,9 @@ twitch:
   clientID:
   clientSecret:
 
+tiktok:
+  videoUrlFormat: https://tiktok.com/@a/video/%s
+
 qnap:
   isEnabled: true
   url:
@@ -72,6 +75,9 @@ discord:
     twitterSpace:
       regexes:
         - 'http[s]?://(?:w{3}\.)?twitter.com/i/spaces/([A-Za-z0-9_]*)'
+    tiktokVideo:
+      regexes:
+        - 'http[s]?://(?:w{3}\.)?tiktok.com/@[A-Za-z0-9_\.]*/video/([0-9]*)'
 
   filterRegexes:
     - '<.*>'                                # Surpressed

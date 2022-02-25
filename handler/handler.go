@@ -25,6 +25,7 @@ var implementedHandlers []Handler = []Handler{
 	&InstagramStoryHandler{},
 	&TwitchLiveStreamHandler{},
 	&TwitterSpaceHandler{},
+	&TiktokVideoHandler{},
 }
 
 func SetupHandlers(ctx context.Context, cfg *config.Config, wg *sync.WaitGroup, logger *zap.SugaredLogger) (handlers []Handler, err error) {
