@@ -17,13 +17,13 @@ type TiktokResp struct {
 }
 
 type RawItem struct {
-	CreateTime     string    `json:"createTime"`
-	AuthorUniqueID string    `json:"author"`
-	Description    string    `json:"desc"`
-	Music          RawMusic  `json:"music"`
-	Video          RawVideo  `json:"video"`
-	Stats          RawStats  `json:"stats"`
-	TextExtra      []*RawTag `json:"textExtra"`
+	CreateTime     string          `json:"createTime"`
+	AuthorUniqueID string          `json:"author"`
+	Description    string          `json:"desc"`
+	Music          RawMusic        `json:"music"`
+	Video          RawVideo        `json:"video"`
+	Stats          RawStats        `json:"stats"`
+	TextExtra      []*RawTextExtra `json:"textExtra"`
 }
 
 type RawVideo struct {
@@ -52,10 +52,11 @@ type RawUser struct {
 	AvatarThumb  string `json:"avatarThumb"`
 }
 
-type RawTag struct {
-	Start int    `json:"start"`
-	End   int    `json:"end"`
-	Name  string `json:"hashtagName"`
+type RawTextExtra struct {
+	Start        int    `json:"start"`
+	End          int    `json:"end"`
+	HashtagName  string `json:"hashtagName"`
+	UserUniqueID string `json:"userUniqueId"`
 }
 
 type Video struct {
@@ -70,7 +71,8 @@ type Video struct {
 	CommentCount uint64
 	ShareCount   uint64
 
-	Tags []*utils.Entity
+	Tags     []*utils.Entity
+	Mentions []*utils.Entity
 
 	CreateTime time.Time
 }

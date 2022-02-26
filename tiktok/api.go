@@ -68,15 +68,7 @@ func (API) GetVideo(postID string) (*Video, error) {
 		return nil, err
 	}
 
-	tags := make([]*utils.Entity, 0, len(rawVideo.TextExtra))
-	for _, tag := range rawVideo.TextExtra {
-		tags = append(tags, utils.NewEntity(
-			utils.GetUTF16StringIdx(rawVideo.Description, tag.Start),
-			utils.SliceUTF16String(rawVideo.Description, tag.Start, tag.End)),
-		)
-	}
-
-	return &Video{
+	video := &Video{
 		ID:          postID,
 		Description: rawVideo.Description,
 		VideoURL:    rawVideo.Video.DownloadAddr,
@@ -99,10 +91,24 @@ func (API) GetVideo(postID string) (*Video, error) {
 		CommentCount: rawVideo.Stats.CommentCount,
 		ShareCount:   rawVideo.Stats.ShareCount,
 
-		Tags: tags,
-
 		CreateTime: time.Unix(createTimeInt, 0),
-	}, nil
+	}
+
+	for _, tag := range rawVideo.TextExtra {
+		if tag.HashtagName != "" {
+			video.Tags = append(video.Tags, utils.NewEntity(
+				utils.GetUTF16StringIdx(rawVideo.Description, tag.Start),
+				utils.SliceUTF16String(rawVideo.Description, tag.Start, tag.End)),
+			)
+		} else if tag.UserUniqueID != "" {
+			video.Mentions = append(video.Mentions, utils.NewEntity(
+				utils.GetUTF16StringIdx(rawVideo.Description, tag.Start),
+				utils.SliceUTF16String(rawVideo.Description, tag.Start, tag.End)),
+			)
+		}
+	}
+
+	return video, nil
 }
 
 func GetTagURL(s string) string {
@@ -112,4 +118,13 @@ func GetTagURL(s string) string {
 	}
 
 	return fmt.Sprintf("https://www.tiktok.com/tag/%s", s)
+}
+
+func GetMentionURL(s string) string {
+	firstChar := string([]rune(s)[0:1])
+	if firstChar == "@" || firstChar == "＠" {
+		s = string([]rune(s)[1:])
+	}
+
+	return fmt.Sprintf("https://www.tiktok.com/@%s", s)
 }

@@ -17,6 +17,9 @@ func (v *Video) GetDiscordMessages() []*discordgo.MessageSend {
 	textWithEntities.AddEntities(func(u *utils.Entity) string {
 		return utils.GetDiscordNamedLink(u.Match, GetTagURL(u.Match[1:]))
 	}, v.Tags...)
+	textWithEntities.AddEntities(func(u *utils.Entity) string {
+		return utils.GetDiscordNamedLink(u.Match, GetMentionURL(u.Match[1:]))
+	}, v.Mentions...)
 
 	segmentedText := textWithEntities.GetReplacedText(4096, 1)
 
