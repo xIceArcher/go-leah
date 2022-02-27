@@ -2,12 +2,15 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"regexp"
+	"strconv"
 	"sync"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/tiktok"
+	"github.com/xIceArcher/go-leah/utils"
 	"go.uber.org/zap"
 )
 
@@ -35,6 +38,23 @@ func (h *TiktokVideoHandler) Handle(ctx context.Context, session *discordgo.Sess
 		logger := logger.With(
 			zap.String("id", id),
 		)
+
+		if _, err := strconv.Atoi(id); err != nil {
+			// This is a short link, expand it
+			expandedURL, err := utils.ExpandURL(fmt.Sprintf("https://vt.tiktok.com/%s", id))
+			if err != nil {
+				logger.With(zap.Error(err)).Error("Failed to expand URL")
+				continue
+			}
+
+			newMatches := h.Match(expandedURL)
+			if len(newMatches) > 0 {
+				id = h.Match(expandedURL)[0]
+			} else {
+				logger.Info("Not video URL")
+				continue
+			}
+		}
 
 		video, err := h.api.GetVideo(id)
 		if err != nil {
