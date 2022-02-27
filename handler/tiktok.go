@@ -15,6 +15,7 @@ type TiktokVideoHandler struct {
 	api *tiktok.API
 
 	RegexManager
+	unimplementedHandler
 }
 
 func (TiktokVideoHandler) String() string {
@@ -25,9 +26,6 @@ func (h *TiktokVideoHandler) Setup(ctx context.Context, cfg *config.Config, rege
 	h.Regexes = regexes
 	h.api, err = tiktok.NewAPI(cfg.Tiktok)
 	return err
-}
-
-func (h *TiktokVideoHandler) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
 }
 
 func (h *TiktokVideoHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (ids []string, err error) {

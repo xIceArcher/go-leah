@@ -17,7 +17,28 @@ type Handler interface {
 	Setup(ctx context.Context, cfg *config.Config, regexp []*regexp.Regexp, wg *sync.WaitGroup) error
 	Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger)
 	Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error)
+
+	mustEmbedUnimplementedHandler()
 }
+
+type unimplementedHandler struct{}
+
+func (h *unimplementedHandler) String() string {
+	return "unimplemented"
+}
+
+func (h *unimplementedHandler) Setup(ctx context.Context, cfg *config.Config, regexp []*regexp.Regexp, wg *sync.WaitGroup) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (h *unimplementedHandler) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
+}
+
+func (h *unimplementedHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (h *unimplementedHandler) mustEmbedUnimplementedHandler() {}
 
 var implementedHandlers []Handler = []Handler{
 	&YoutubeLiveStreamHandler{},

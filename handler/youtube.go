@@ -29,6 +29,7 @@ type YoutubeLiveStreamHandler struct {
 	wg    *sync.WaitGroup
 
 	RegexManager
+	unimplementedHandler
 }
 
 func (YoutubeLiveStreamHandler) String() string {

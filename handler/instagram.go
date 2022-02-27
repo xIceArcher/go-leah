@@ -19,6 +19,7 @@ type InstagramPostHandler struct {
 	api *instagram.API
 
 	RegexManager
+	unimplementedHandler
 }
 
 func (InstagramPostHandler) String() string {
@@ -29,9 +30,6 @@ func (h *InstagramPostHandler) Setup(ctx context.Context, cfg *config.Config, re
 	h.Regexes = regexes
 	h.api, err = instagram.NewAPI(cfg.Instagram)
 	return err
-}
-
-func (h *InstagramPostHandler) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
 }
 
 func (h *InstagramPostHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (shortcodes []string, err error) {
@@ -135,6 +133,7 @@ type InstagramStoryHandler struct {
 	api *instagram.API
 
 	RegexManager
+	unimplementedHandler
 }
 
 func (InstagramStoryHandler) String() string {
@@ -145,9 +144,6 @@ func (h *InstagramStoryHandler) Setup(ctx context.Context, cfg *config.Config, r
 	h.Regexes = regexes
 	h.api, err = instagram.NewAPI(cfg.Instagram)
 	return err
-}
-
-func (h *InstagramStoryHandler) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
 }
 
 func (h *InstagramStoryHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (usernames []string, err error) {

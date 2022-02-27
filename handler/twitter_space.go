@@ -15,6 +15,7 @@ type TwitterSpaceHandler struct {
 	api twitter.API
 
 	RegexManager
+	unimplementedHandler
 }
 
 func (TwitterSpaceHandler) String() string {
@@ -25,9 +26,6 @@ func (h *TwitterSpaceHandler) Setup(ctx context.Context, cfg *config.Config, reg
 	h.Regexes = regexes
 	h.api = twitter.NewBaseAPI(cfg.Twitter)
 	return err
-}
-
-func (h *TwitterSpaceHandler) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
 }
 
 func (h *TwitterSpaceHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (spaceIDs []string, err error) {

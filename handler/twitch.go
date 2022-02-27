@@ -20,6 +20,7 @@ type TwitchLiveStreamHandler struct {
 	api *twitch.API
 
 	RegexManager
+	unimplementedHandler
 }
 
 func (TwitchLiveStreamHandler) String() string {
@@ -30,9 +31,6 @@ func (h *TwitchLiveStreamHandler) Setup(ctx context.Context, cfg *config.Config,
 	h.Regexes = regexes
 	h.api, err = twitch.NewAPI(cfg.Twitch)
 	return err
-}
-
-func (h *TwitchLiveStreamHandler) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
 }
 
 func (h *TwitchLiveStreamHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (loginNames []string, err error) {
