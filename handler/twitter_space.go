@@ -28,7 +28,7 @@ func (h *TwitterSpaceHandler) Setup(ctx context.Context, cfg *config.Config, reg
 	return err
 }
 
-func (h *TwitterSpaceHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (spaceIDs []string, err error) {
+func (h *TwitterSpaceHandler) Handle(ctx context.Context, session *discordgo.Session, guildID string, channelID string, msg string, logger *zap.SugaredLogger) (spaceIDs []string, err error) {
 	spaceIDs = h.Match(msg)
 	embeds := make([]*discordgo.MessageEmbed, 0, len(spaceIDs))
 

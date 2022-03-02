@@ -5,15 +5,14 @@ import (
 	"fmt"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/xIceArcher/go-leah/consts"
 )
 
 func GetDiscordNamedLink(text string, url string) string {
 	return fmt.Sprintf("[%s](%s)", text, url)
 }
 
-func DownloadAndAttachImage(message *discordgo.MessageSend, url string, fileName string) {
-	file, _, err := Download(url, int64(consts.DiscordMessageMaxBytes))
+func DownloadAndAttachImage(message *discordgo.MessageSend, url string, fileName string, maxBytes int64) {
+	file, _, err := Download(url, maxBytes)
 	if err != nil {
 		message.Embed.Image = &discordgo.MessageEmbedImage{
 			URL: url,
@@ -43,8 +42,8 @@ func DownloadAndAttachImage(message *discordgo.MessageSend, url string, fileName
 	}
 }
 
-func DownloadVideo(url string, fileName string) *discordgo.MessageSend {
-	file, _, err := Download(url, int64(consts.DiscordMessageMaxBytes))
+func DownloadVideo(url string, fileName string, maxBytes int64) *discordgo.MessageSend {
+	file, _, err := Download(url, maxBytes)
 	if err != nil {
 		return &discordgo.MessageSend{
 			Content: url,
@@ -62,11 +61,9 @@ func DownloadVideo(url string, fileName string) *discordgo.MessageSend {
 	}
 }
 
-func SplitVideos(urls []string, fileNamePrefix string) (messages []*discordgo.MessageSend) {
-	maxBytes := int64(consts.DiscordMessageMaxBytes)
-
+func SplitVideos(urls []string, fileNamePrefix string, maxBytes int64) (messages []*discordgo.MessageSend) {
 	files := make([]*discordgo.File, 0)
-	remainingBytes := int64(consts.DiscordMessageMaxBytes)
+	remainingBytes := maxBytes
 
 	for i, url := range urls {
 		file, bytes, err := Download(url, remainingBytes)
@@ -108,4 +105,22 @@ func SplitVideos(urls []string, fileNamePrefix string) (messages []*discordgo.Me
 	}
 
 	return messages
+}
+
+func GetDiscordMessageMaxBytes(boostTier discordgo.PremiumTier) int64 {
+	megaByte := 1000 * 1000
+	slackBytes := 5000
+
+	var availableBytes int
+
+	switch boostTier {
+	case discordgo.PremiumTier3:
+		availableBytes = 100 * megaByte
+	case discordgo.PremiumTier2:
+		availableBytes = 50 * megaByte
+	default:
+		availableBytes = 8 * megaByte
+	}
+
+	return int64(availableBytes - slackBytes)
 }

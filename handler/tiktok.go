@@ -31,7 +31,7 @@ func (h *TiktokVideoHandler) Setup(ctx context.Context, cfg *config.Config, rege
 	return err
 }
 
-func (h *TiktokVideoHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (ids []string, err error) {
+func (h *TiktokVideoHandler) Handle(ctx context.Context, session *discordgo.Session, guildID string, channelID string, msg string, logger *zap.SugaredLogger) (ids []string, err error) {
 	ids = h.Match(msg)
 
 	for _, id := range ids {
@@ -62,7 +62,16 @@ func (h *TiktokVideoHandler) Handle(ctx context.Context, session *discordgo.Sess
 			continue
 		}
 
-		messages := video.GetDiscordMessages()
+		maxMessageBytes := utils.GetDiscordMessageMaxBytes(discordgo.PremiumTierNone)
+
+		guild, err := session.Guild(guildID)
+		if err != nil {
+			logger.With(zap.Error(err)).Error("Get guild")
+		} else {
+			maxMessageBytes = utils.GetDiscordMessageMaxBytes(guild.PremiumTier)
+		}
+
+		messages := video.GetDiscordMessages(maxMessageBytes)
 
 		for _, message := range messages {
 			if _, err := session.ChannelMessageSendComplex(channelID, message); err != nil {

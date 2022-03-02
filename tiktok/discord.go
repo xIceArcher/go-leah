@@ -10,7 +10,7 @@ import (
 	"github.com/xIceArcher/go-leah/utils"
 )
 
-func (v *Video) GetDiscordMessages() []*discordgo.MessageSend {
+func (v *Video) GetDiscordMessages(maxMessageBytes int64) []*discordgo.MessageSend {
 	messages := make([]*discordgo.MessageSend, 0, 2)
 
 	textWithEntities := &utils.TextWithEntities{Text: v.Description}
@@ -65,7 +65,7 @@ func (v *Video) GetDiscordMessages() []*discordgo.MessageSend {
 		Embeds: []*discordgo.MessageEmbed{embed},
 	})
 
-	messages = append(messages, utils.DownloadVideo(v.VideoURL, v.ID))
+	messages = append(messages, utils.DownloadVideo(v.VideoURL, v.ID, maxMessageBytes))
 
 	return messages
 }

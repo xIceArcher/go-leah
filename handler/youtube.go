@@ -92,7 +92,7 @@ func (h *YoutubeLiveStreamHandler) Resume(ctx context.Context, session *discordg
 	}
 }
 
-func (h *YoutubeLiveStreamHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (videoIDs []string, err error) {
+func (h *YoutubeLiveStreamHandler) Handle(ctx context.Context, session *discordgo.Session, guildID string, channelID string, msg string, logger *zap.SugaredLogger) (videoIDs []string, err error) {
 	videoIDs = h.Match(msg)
 
 	videos := make([]*youtube.Video, 0, len(videoIDs))

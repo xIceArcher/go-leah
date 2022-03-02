@@ -16,7 +16,7 @@ type Handler interface {
 	String() string
 	Setup(ctx context.Context, cfg *config.Config, regexp []*regexp.Regexp, wg *sync.WaitGroup) error
 	Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger)
-	Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error)
+	Handle(ctx context.Context, session *discordgo.Session, guildID string, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error)
 
 	mustEmbedUnimplementedHandler()
 }
@@ -34,7 +34,7 @@ func (h *unimplementedHandler) Setup(ctx context.Context, cfg *config.Config, re
 func (h *unimplementedHandler) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
 }
 
-func (h *unimplementedHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error) {
+func (h *unimplementedHandler) Handle(ctx context.Context, session *discordgo.Session, guildID string, channelID string, msg string, logger *zap.SugaredLogger) ([]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

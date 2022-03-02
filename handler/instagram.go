@@ -32,7 +32,7 @@ func (h *InstagramPostHandler) Setup(ctx context.Context, cfg *config.Config, re
 	return err
 }
 
-func (h *InstagramPostHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (shortcodes []string, err error) {
+func (h *InstagramPostHandler) Handle(ctx context.Context, session *discordgo.Session, guildID string, channelID string, msg string, logger *zap.SugaredLogger) (shortcodes []string, err error) {
 	shortcodes = h.Match(msg)
 
 	for _, shortcode := range shortcodes {
@@ -111,7 +111,16 @@ func (h *InstagramPostHandler) Handle(ctx context.Context, session *discordgo.Se
 			logger.Warn("More than 10 embeds in one message")
 		}
 
-		videoMessages := utils.SplitVideos(post.VideoURLs, shortcode)
+		maxMessageBytes := utils.GetDiscordMessageMaxBytes(discordgo.PremiumTierNone)
+
+		guild, err := session.Guild(guildID)
+		if err != nil {
+			logger.With(zap.Error(err)).Error("Get guild")
+		} else {
+			maxMessageBytes = utils.GetDiscordMessageMaxBytes(guild.PremiumTier)
+		}
+
+		videoMessages := utils.SplitVideos(post.VideoURLs, shortcode, maxMessageBytes)
 
 		if _, err = session.ChannelMessageSendEmbeds(channelID, embeds); err != nil {
 			logger.With(zap.Error(err)).Error("Send post embeds")
@@ -146,7 +155,7 @@ func (h *InstagramStoryHandler) Setup(ctx context.Context, cfg *config.Config, r
 	return err
 }
 
-func (h *InstagramStoryHandler) Handle(ctx context.Context, session *discordgo.Session, channelID string, msg string, logger *zap.SugaredLogger) (usernames []string, err error) {
+func (h *InstagramStoryHandler) Handle(ctx context.Context, session *discordgo.Session, guildID string, channelID string, msg string, logger *zap.SugaredLogger) (usernames []string, err error) {
 	usernames = h.Match(msg)
 
 	for _, username := range usernames {
@@ -180,8 +189,17 @@ func (h *InstagramStoryHandler) Handle(ctx context.Context, session *discordgo.S
 			Embed: embed,
 		}
 
+		maxMessageBytes := utils.GetDiscordMessageMaxBytes(discordgo.PremiumTierNone)
+
+		guild, err := session.Guild(guildID)
+		if err != nil {
+			logger.With(zap.Error(err)).Error("Get guild")
+		} else {
+			maxMessageBytes = utils.GetDiscordMessageMaxBytes(guild.PremiumTier)
+		}
+
 		if story.IsImage() {
-			utils.DownloadAndAttachImage(baseMessage, story.MediaURL, username)
+			utils.DownloadAndAttachImage(baseMessage, story.MediaURL, username, maxMessageBytes)
 		}
 
 		if _, err = session.ChannelMessageSendComplex(channelID, baseMessage); err != nil {
@@ -190,7 +208,8 @@ func (h *InstagramStoryHandler) Handle(ctx context.Context, session *discordgo.S
 		}
 
 		if story.IsVideo() {
-			videoMessage := utils.DownloadVideo(story.MediaURL, username)
+
+			videoMessage := utils.DownloadVideo(story.MediaURL, username, maxMessageBytes)
 			if _, err = session.ChannelMessageSendComplex(channelID, videoMessage); err != nil {
 				logger.With(zap.Error(err)).Error("Send post video")
 				continue

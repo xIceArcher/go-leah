@@ -14,9 +14,5 @@ const (
 )
 
 const (
-	DiscordMessageMaxBytes = 7995000
-)
-
-const (
 	TimeFormatYYMMDDHHMMSS = "060102150405"
 )
