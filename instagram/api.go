@@ -136,6 +136,7 @@ func (API) GetStory(username string, storyID string) (*Story, error) {
 	}
 
 	return &Story{
+		ID: strings.Split(rawReel.ID, "_")[0],
 		Owner: &User{
 			Username:      rawResp.User.Username,
 			Fullname:      fullName,

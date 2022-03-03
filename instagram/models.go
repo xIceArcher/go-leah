@@ -193,6 +193,7 @@ func (p *Post) URL() string {
 }
 
 type Story struct {
+	ID        string
 	Owner     *User
 	Timestamp time.Time
 	MediaURL  string
@@ -200,7 +201,7 @@ type Story struct {
 }
 
 func (s *Story) URL() string {
-	return fmt.Sprintf("https://www.instagram.com/stories/%s", s.Owner.Username)
+	return fmt.Sprintf("https://www.instagram.com/stories/%s/%s", s.Owner.Username, s.ID)
 }
 
 func (s *Story) IsImage() bool {
