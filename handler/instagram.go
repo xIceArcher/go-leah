@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -155,15 +156,27 @@ func (h *InstagramStoryHandler) Setup(ctx context.Context, cfg *config.Config, r
 	return err
 }
 
-func (h *InstagramStoryHandler) Handle(ctx context.Context, session *discordgo.Session, guildID string, channelID string, msg string, logger *zap.SugaredLogger) (usernames []string, err error) {
-	usernames = h.Match(msg)
+func (h *InstagramStoryHandler) Handle(ctx context.Context, session *discordgo.Session, guildID string, channelID string, msg string, logger *zap.SugaredLogger) (matches []string, err error) {
+	matches = h.Match(msg)
 
-	for _, username := range usernames {
+	for _, match := range matches {
 		logger := logger.With(
-			zap.String("username", username),
+			zap.String("match", match),
 		)
 
-		story, err := h.api.GetStory(username)
+		username := match
+		storyID := ""
+		if strings.Contains(match, "/") {
+			parts := strings.Split(match, "/")
+			if len(parts) != 2 {
+				logger.Error("Unknown match")
+				continue
+			}
+
+			username, storyID = parts[0], parts[1]
+		}
+
+		story, err := h.api.GetStory(username, storyID)
 		if err != nil {
 			logger.With(zap.Error(err)).Error("Get story")
 			continue
@@ -208,8 +221,7 @@ func (h *InstagramStoryHandler) Handle(ctx context.Context, session *discordgo.S
 		}
 
 		if story.IsVideo() {
-
-			videoMessage := utils.DownloadVideo(story.MediaURL, username, maxMessageBytes)
+			videoMessage := utils.DownloadVideo(story.MediaURL, match, maxMessageBytes)
 			if _, err = session.ChannelMessageSendComplex(channelID, videoMessage); err != nil {
 				logger.With(zap.Error(err)).Error("Send post video")
 				continue
@@ -217,5 +229,5 @@ func (h *InstagramStoryHandler) Handle(ctx context.Context, session *discordgo.S
 		}
 	}
 
-	return usernames, nil
+	return matches, nil
 }

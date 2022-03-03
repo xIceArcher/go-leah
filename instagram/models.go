@@ -57,6 +57,7 @@ func (m *RawCarouselMedia) IsVideo() bool {
 }
 
 type RawReelMedia struct {
+	ID               string            `json:"id"`
 	ImageVersions    *RawImageVersions `json:"image_versions2"`
 	VideoVersions    []*RawVideo       `json:"video_versions"`
 	MediaType        MediaType         `json:"media_type"`

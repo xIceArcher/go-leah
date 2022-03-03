@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -82,7 +83,7 @@ func (API) GetPost(shortcode string) (*Post, error) {
 	}, nil
 }
 
-func (API) GetStory(username string) (*Story, error) {
+func (API) GetStory(username string, storyID string) (*Story, error) {
 	resp, err := client.Get(fmt.Sprintf(instaStoryURLFormat, username))
 	if err != nil {
 		return nil, err
@@ -107,13 +108,27 @@ func (API) GetStory(username string) (*Story, error) {
 		return nil, errors.New("failed to get stories")
 	}
 
-	latestReelIdx := 0
-	for i, reel := range rawResp.ReelMedia {
-		if reel.TakenAtTimestamp > rawResp.ReelMedia[latestReelIdx].TakenAtTimestamp {
-			latestReelIdx = i
+	var rawReel *RawReelMedia
+	if storyID != "" {
+		for _, reel := range rawResp.ReelMedia {
+			if strings.HasPrefix(reel.ID, storyID) {
+				rawReel = reel
+				break
+			}
 		}
+
+		if rawReel == nil {
+			return nil, errors.New("failed to get story")
+		}
+	} else {
+		latestReelIdx := 0
+		for i, reel := range rawResp.ReelMedia {
+			if reel.TakenAtTimestamp > rawResp.ReelMedia[latestReelIdx].TakenAtTimestamp {
+				latestReelIdx = i
+			}
+		}
+		rawReel = rawResp.ReelMedia[latestReelIdx]
 	}
-	rawReel := rawResp.ReelMedia[latestReelIdx]
 
 	fullName := rawResp.User.FullName
 	if fullName == "" {
