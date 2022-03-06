@@ -60,7 +60,7 @@ func (s *CombinedStalker) Restart() error {
 	s.restartLock.Lock()
 	defer s.restartLock.Unlock()
 
-	if time.Since(s.lastRestartTime) < 10*time.Second {
+	if time.Since(s.lastRestartTime) < 5*time.Minute {
 		return nil
 	}
 
