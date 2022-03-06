@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/BurntSushi/toml v0.4.1 // indirect
-	github.com/bwmarrin/discordgo v0.23.2
+	github.com/bwmarrin/discordgo v0.24.0
 	github.com/dghubble/go-twitter v0.0.0-20211002212826-ad02880e616b
 	github.com/dghubble/oauth1 v0.7.0
 	github.com/docker/go-units v0.4.0
@@ -37,5 +37,3 @@ require (
 	google.golang.org/genproto v0.0.0-20211029142109-e255c875f7c7 // indirect
 	google.golang.org/grpc v1.41.0 // indirect
 )
-
-replace github.com/bwmarrin/discordgo => github.com/xicearcher/discordgo v0.23.3-0.20210918115336-a3ed5a759b50
