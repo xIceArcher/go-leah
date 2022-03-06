@@ -6,11 +6,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/utils"
+	"go.uber.org/zap"
 )
 
 type API struct{}
@@ -96,15 +98,29 @@ func (API) GetVideo(postID string) (*Video, error) {
 
 	for _, tag := range rawVideo.TextExtra {
 		if tag.HashtagName != "" {
+			hashtagText := utils.SliceUTF16String(rawVideo.Description, tag.Start, tag.End)
+
+			if !strings.HasSuffix(strings.ToLower(hashtagText), tag.HashtagName) {
+				zap.S().With(zap.String("expected", tag.HashtagName)).With("actual", hashtagText).Warn("Inconsistent hashtag text")
+				continue
+			}
+
 			video.Tags = append(video.Tags, utils.NewEntity(
 				utils.GetUTF16StringIdx(rawVideo.Description, tag.Start),
-				utils.SliceUTF16String(rawVideo.Description, tag.Start, tag.End)),
-			)
+				hashtagText,
+			))
 		} else if tag.UserUniqueID != "" {
+			mentionText := utils.SliceUTF16String(rawVideo.Description, tag.Start, tag.End)
+
+			if !strings.HasSuffix(strings.ToLower(mentionText), tag.UserUniqueID) {
+				zap.S().With(zap.String("expected", tag.UserUniqueID)).With("actual", mentionText).Warn("Inconsistent mention text")
+				continue
+			}
+
 			video.Mentions = append(video.Mentions, utils.NewEntity(
 				utils.GetUTF16StringIdx(rawVideo.Description, tag.Start),
-				utils.SliceUTF16String(rawVideo.Description, tag.Start, tag.End)),
-			)
+				mentionText,
+			))
 		}
 	}
 

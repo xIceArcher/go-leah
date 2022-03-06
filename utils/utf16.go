@@ -10,6 +10,10 @@ func GetUTF16StringIdx(s string, utf16Idx int) int {
 func SliceUTF16String(s string, start int, end int) string {
 	utf16EncodedStr := utf16.Encode([]rune(s))
 
+	if end > len(utf16EncodedStr) {
+		end = len(utf16EncodedStr)
+	}
+
 	slice := utf16EncodedStr[start:end]
 	return string(utf16.Decode(slice))
 }
