@@ -3,6 +3,7 @@ package qnap
 import (
 	"crypto/tls"
 	"encoding/base64"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -138,7 +139,10 @@ func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []stri
 				SetFile("file", file.Path).
 				SetResult(chunkedUploadResp).
 				Post(a.utilRequestPath())
-			if err != nil {
+			if err == io.EOF {
+				logger.Warn("Received EOF")
+				break
+			} else if err != nil {
 				logger.With(zap.Error(err)).Warn("Error uploading fragment")
 				continue
 			}
