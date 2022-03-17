@@ -2,7 +2,8 @@ package utils
 
 import (
 	"regexp"
-	"sort"
+
+	"golang.org/x/exp/slices"
 )
 
 type TextWithEntities struct {
@@ -27,8 +28,8 @@ func (t *TextWithEntities) AddEntities(f func(*Entity) string, entities ...*Enti
 }
 
 func (t *TextWithEntities) GetReplacedText(maxBytes int, n int) (ret []string) {
-	sort.Slice(t.Entities, func(i, j int) bool {
-		return t.Entities[i].Start() < t.Entities[j].Start()
+	slices.SortFunc(t.Entities, func(a, b *Entity) bool {
+		return a.Start() < b.Start()
 	})
 
 	currBytesLeft := maxBytes

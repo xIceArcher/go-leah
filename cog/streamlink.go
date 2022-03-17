@@ -12,7 +12,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +27,7 @@ import (
 	"github.com/xIceArcher/go-leah/consts"
 	"github.com/xIceArcher/go-leah/qnap"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -283,8 +283,8 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 					})
 				}
 
-				sort.Slice(runs[runNo], func(i, j int) bool {
-					return runs[runNo][i].SeqNo < runs[runNo][j].SeqNo
+				slices.SortFunc(runs[runNo], func(i, j *DownloadedFile) bool {
+					return i.SeqNo < j.SeqNo
 				})
 			}
 

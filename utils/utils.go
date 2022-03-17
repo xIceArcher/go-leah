@@ -78,8 +78,8 @@ func ParseHexColor(s string) int {
 	return int(colorInt)
 }
 
-func Unique(ss []string) (ret []string) {
-	mp := make(map[string]struct{})
+func Unique[T comparable](ss []T) (ret []T) {
+	mp := make(map[T]struct{})
 
 	for _, s := range ss {
 		if _, ok := mp[s]; !ok {
@@ -89,14 +89,4 @@ func Unique(ss []string) (ret []string) {
 	}
 
 	return ret
-}
-
-func Contains(ss []string, toFind string) bool {
-	for _, s := range ss {
-		if s == toFind {
-			return true
-		}
-	}
-
-	return false
 }

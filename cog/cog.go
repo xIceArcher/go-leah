@@ -7,8 +7,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
-	"github.com/xIceArcher/go-leah/utils"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 )
 
 var implementedCogs []Cog = []Cog{
@@ -65,7 +65,7 @@ func (c *DiscordBotCog) Handle(ctx context.Context, command string, session *dis
 			return ErrInsufficientPermissions
 		}
 
-		if len(c.cogCfg.ChannelIDs) > 0 && !utils.Contains(c.cogCfg.ChannelIDs, msg.ChannelID) {
+		if len(c.cogCfg.ChannelIDs) > 0 && !slices.Contains(c.cogCfg.ChannelIDs, msg.ChannelID) {
 			return ErrIllegalAccess
 		}
 
