@@ -91,9 +91,4 @@ redis:
   db: 0
 
 logger:
-  level: info
-  encoding: console
-  outputPaths:
-    - stdout
-  errOutputPaths:
-    - stderr
+  logPath: /log/

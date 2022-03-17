@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"github.com/jinzhu/configor"
-	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -18,7 +17,7 @@ type Config struct {
 	Discord *DiscordConfig `yaml:"discord"`
 
 	Redis  *RedisConfig `yaml:"redis"`
-	Logger *zap.Config  `yaml:"logger"`
+	Logger *LogConfig   `yaml:"logger"`
 }
 
 type TwitterConfig struct {
@@ -85,6 +84,10 @@ type RedisConfig struct {
 	Port     int    `yaml:"port"`
 	Password string `yaml:"password"`
 	DB       int    `yaml:"db"`
+}
+
+type LogConfig struct {
+	LogPath string `yaml:"logPath"`
 }
 
 func (c *Config) LoadConfig(path string) error {

@@ -25,6 +25,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20211028175245-ba495a64dcb5
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/api v0.60.0
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
 require (
