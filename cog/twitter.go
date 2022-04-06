@@ -3,224 +3,139 @@ package cog
 import (
 	"context"
 	"errors"
-	"sync"
+	"fmt"
 
-	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/cache"
 	"github.com/xIceArcher/go-leah/config"
+	"github.com/xIceArcher/go-leah/discord"
 	"github.com/xIceArcher/go-leah/twitter"
 	"github.com/xIceArcher/go-leah/utils"
 	"go.uber.org/zap"
 )
 
-const (
-	twitterLinkNotFound   = "Message does not contain a valid Twitter link!"
-	twitterTweetNotFound  = "Tweet not found!"
-	twitterVideoNotFound  = "Tweet does not contain a video!"
-	twitterPhotosNotFound = "Tweet does not contain photos!"
-	twitterQuotedNotFound = "Tweet does not quote any other tweet!"
+var (
+	ErrTwitterLinkNotFound   error = fmt.Errorf("Message does not contain a valid Twitter link!")
+	ErrTwitterTweetNotFound  error = fmt.Errorf("Tweet not found!")
+	ErrTwitterVideoNotFound  error = fmt.Errorf("Tweet does not contain a video!")
+	ErrTwitterPhotosNotFound error = fmt.Errorf("Tweet does not contain photos!")
+	ErrTwitterQuotedNotFound error = fmt.Errorf("Tweet does not quote any other tweet!")
+
+	ErrFetchTweet error = fmt.Errorf("Could not fetch this tweet for some reason")
 )
 
-var api twitter.API
-
 type TwitterCog struct {
-	DiscordBotCog
+	GenericCog
+
+	api twitter.API
 }
 
-func (TwitterCog) String() string {
-	return "twitter"
-}
-
-func (c *TwitterCog) Setup(ctx context.Context, cfg *config.Config, wg *sync.WaitGroup) error {
-	c.DiscordBotCog.Setup(c, cfg, wg)
+func NewTwitterCog(cfg *config.Config, s *discord.Session) (Cog, error) {
+	c := &TwitterCog{}
 
 	cache, err := cache.NewRedisCache(cfg.Redis)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	api = twitter.NewCachedAPI(cfg.Twitter, cache, zap.S())
-	return nil
-}
+	c.api = twitter.NewCachedAPI(cfg.Twitter, cache, zap.S())
 
-func (c *TwitterCog) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
-}
-
-func (TwitterCog) Commands() []Command {
-	return []Command{
-		&EmbedCommand{},
-		&PhotosCommand{},
-		&VideoCommand{},
-		&QuotedCommand{},
-	}
-}
-
-type EmbedCommand struct{}
-
-func (EmbedCommand) String() string {
-	return "embed"
-}
-
-func (EmbedCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
-	if len(args) == 0 {
-		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
-		return err
+	c.allCommands = map[string]CommandFunc{
+		"embed":  c.Embed,
+		"photos": c.Photos,
+		"video":  c.Video,
+		"quoted": c.Quoted,
 	}
 
-	matches := extractTweetIDs(args[0])
-	if len(matches) == 0 {
-		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
-		return err
-	}
+	return c, nil
+}
 
-	tweet, err := api.GetTweet(matches[0])
+func (c *TwitterCog) Embed(ctx context.Context, s *discord.MessageSession, args []string) {
+	tweet, err := c.getTweetFromArgs(args)
 	if err != nil {
-		if errors.Is(err, twitter.ErrNotFound) {
-			_, err = session.ChannelMessageSend(channelID, twitterTweetNotFound)
-			return err
-		}
-		return err
+		s.SendError(err)
+		return
 	}
 
-	if _, err = session.ChannelMessageSendEmbeds(channelID, tweet.GetEmbeds()); err != nil {
-		return err
-	}
-
+	s.SendEmbeds(tweet.GetEmbeds())
 	if tweet.HasVideo {
-		if _, err = session.ChannelMessageSend(channelID, tweet.VideoURL); err != nil {
-			return err
-		}
+		s.SendVideo(tweet.VideoURL, s.Message.ID)
 	}
-
-	return nil
 }
 
-type PhotosCommand struct{}
-
-func (PhotosCommand) String() string {
-	return "photos"
-}
-
-func (PhotosCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
-	if len(args) == 0 {
-		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
-		return err
-	}
-
-	matches := extractTweetIDs(args[0])
-	if len(matches) == 0 {
-		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
-		return err
-	}
-
-	tweet, err := api.GetTweet(matches[0])
+func (c *TwitterCog) Photos(ctx context.Context, s *discord.MessageSession, args []string) {
+	tweet, err := c.getTweetFromArgs(args)
 	if err != nil {
-		if errors.Is(err, twitter.ErrNotFound) {
-			_, err = session.ChannelMessageSend(channelID, twitterTweetNotFound)
-			return err
-		}
-		return err
+		s.SendError(err)
+		return
 	}
 
 	if !tweet.HasPhotos {
-		_, err = session.ChannelMessageSend(channelID, twitterPhotosNotFound)
-		return err
+		s.SendError(ErrTwitterPhotosNotFound)
+		return
 	}
 
 	if len(tweet.PhotoURLs) == 1 {
-		return nil
+		return
 	}
 
-	embeds := tweet.GetPhotoEmbeds()[1:]
-	_, err = session.ChannelMessageSendEmbeds(channelID, embeds)
-	return err
+	s.SendEmbeds(tweet.GetPhotoEmbeds()[1:])
 }
 
-type VideoCommand struct{}
-
-func (VideoCommand) String() string {
-	return "video"
-}
-
-func (VideoCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
-	if len(args) == 0 {
-		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
-		return err
-	}
-
-	matches := extractTweetIDs(args[0])
-	if len(matches) == 0 {
-		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
-		return err
-	}
-
-	tweet, err := api.GetTweet(matches[0])
+func (c *TwitterCog) Video(ctx context.Context, s *discord.MessageSession, args []string) {
+	tweet, err := c.getTweetFromArgs(args)
 	if err != nil {
-		if errors.Is(err, twitter.ErrNotFound) {
-			_, err = session.ChannelMessageSend(channelID, twitterTweetNotFound)
-			return err
-		}
-		return err
+		s.SendError(err)
+		return
 	}
 
 	if !tweet.HasVideo {
-		_, err = session.ChannelMessageSend(channelID, twitterVideoNotFound)
-		return err
+		s.SendError(ErrTwitterVideoNotFound)
+		return
 	}
 
-	if _, err = session.ChannelMessageSend(channelID, tweet.VideoURL); err != nil {
-		return err
-	}
-
-	return nil
+	s.SendVideo(tweet.VideoURL, s.Message.ID)
 }
 
-type QuotedCommand struct{}
-
-func (QuotedCommand) String() string {
-	return "quoted"
-}
-
-func (QuotedCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
-	if len(args) == 0 {
-		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
-		return err
-	}
-
-	matches := extractTweetIDs(args[0])
-	if len(matches) == 0 {
-		_, err = session.ChannelMessageSend(channelID, twitterLinkNotFound)
-		return err
-	}
-
-	tweet, err := api.GetTweet(matches[0])
+func (c *TwitterCog) Quoted(ctx context.Context, s *discord.MessageSession, args []string) {
+	tweet, err := c.getTweetFromArgs(args)
 	if err != nil {
-		if errors.Is(err, twitter.ErrNotFound) {
-			_, err = session.ChannelMessageSend(channelID, twitterTweetNotFound)
-			return err
-		}
-		return err
+		s.SendError(err)
+		return
 	}
 
 	if !tweet.IsQuoted {
-		_, err = session.ChannelMessageSend(channelID, twitterQuotedNotFound)
-		return err
+		s.SendError(ErrTwitterQuotedNotFound)
+		return
 	}
 
-	_, err = session.ChannelMessageSendEmbeds(channelID, tweet.QuotedStatus.GetEmbeds())
-	if err != nil {
-		return err
+	s.SendEmbeds(tweet.QuotedStatus.GetEmbeds())
+	if tweet.HasVideo {
+		s.SendVideo(tweet.QuotedStatus.VideoURL, s.Message.ID)
 	}
-
-	if !tweet.QuotedStatus.HasVideo {
-		return nil
-	}
-
-	_, err = session.ChannelMessageSend(channelID, tweet.QuotedStatus.VideoURL)
-	return err
 }
 
-func extractTweetIDs(s string) []string {
+func (c *TwitterCog) getTweetFromArgs(args []string) (*twitter.Tweet, error) {
+	if len(args) == 0 {
+		return nil, ErrTwitterLinkNotFound
+	}
+
+	matches := c.extractTweetIDs(args[0])
+	if len(matches) == 0 {
+		return nil, ErrTwitterLinkNotFound
+	}
+
+	tweet, err := c.api.GetTweet(matches[0])
+	if err != nil {
+		if errors.Is(err, twitter.ErrNotFound) {
+			return nil, ErrTwitterTweetNotFound
+		}
+		return nil, ErrFetchTweet
+	}
+
+	return tweet, nil
+}
+
+func (c *TwitterCog) extractTweetIDs(s string) []string {
 	allMatches := twitter.URLRegex.FindAllStringSubmatch(s, -1)
 
 	matches := make([]string, 0, len(allMatches))

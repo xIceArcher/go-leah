@@ -13,6 +13,10 @@ import (
 type StreamStalker struct {
 	*twitterStalker
 
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+
 	MaxRestartRetries int
 
 	stream *twitter.Stream
@@ -24,7 +28,7 @@ var (
 	streamStalkerSetupOnce sync.Once
 )
 
-func NewStreamStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.WaitGroup, api API, logger *zap.SugaredLogger) *StreamStalker {
+func NewStreamStalker(cfg *config.TwitterConfig, api API, logger *zap.SugaredLogger) *StreamStalker {
 	streamStalkerSetupOnce.Do(func() {
 		streamStalker = &StreamStalker{
 			twitterStalker: newTwitterStalker(logger),
@@ -54,15 +58,15 @@ func NewStreamStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.W
 				streamStalker.logger.With(zap.Error(err)).Error("Stream crashed and cannot be recovered")
 			}
 		}
-
-		go streamStalker.RestartTask(ctx, wg)
-		go streamStalker.CleanupTask(ctx, wg)
 	})
 
 	return streamStalker
 }
 
 func (s *StreamStalker) Start() (err error) {
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	go streamStalker.restartTask(s.ctx)
+
 	if len(s.userIDs) == 0 {
 		return nil
 	}
@@ -83,19 +87,14 @@ func (s *StreamStalker) Start() (err error) {
 	}
 
 	go s.demux.HandleChan(s.stream.Messages)
+
+	s.isStarted = true
 	return nil
 }
 
-func (s *StreamStalker) Stop() {
-	if s.stream != nil {
-		s.stream.Stop()
-	}
-	s.stream = nil
-}
-
-func (s *StreamStalker) RestartTask(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(1)
-	defer wg.Done()
+func (s *StreamStalker) restartTask(ctx context.Context) {
+	s.wg.Add(1)
+	defer s.wg.Done()
 
 	for {
 		select {
@@ -105,7 +104,10 @@ func (s *StreamStalker) RestartTask(ctx context.Context, wg *sync.WaitGroup) {
 			currRestartRetries := 0
 			var err error
 
-			s.Stop()
+			if s.stream != nil {
+				s.stream.Stop()
+			}
+			s.stream = nil
 
 			for currRestartRetries < s.MaxRestartRetries {
 				if err = s.Start(); err != nil {
@@ -125,10 +127,14 @@ func (s *StreamStalker) RestartTask(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (s *StreamStalker) CleanupTask(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(1)
-	defer wg.Done()
+func (s *StreamStalker) Stop() {
+	s.cancel()
 
-	<-ctx.Done()
-	s.Stop()
+	if s.stream != nil {
+		// Sometimes s.stream.Stop() panics
+		defer func() { recover() }()
+		s.stream.Stop()
+	}
+
+	s.wg.Wait()
 }

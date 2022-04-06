@@ -16,204 +16,130 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
 	"github.com/docker/go-units"
 	"github.com/grafov/m3u8"
-	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/jessevdk/go-flags"
 	"github.com/ricochet2200/go-disk-usage/du"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/consts"
+	"github.com/xIceArcher/go-leah/discord"
+	httpclient "github.com/xIceArcher/go-leah/http"
 	"github.com/xIceArcher/go-leah/qnap"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
-	"golang.org/x/sync/errgroup"
 )
 
-var qnapConfig *config.QNAPConfig
-
-type StreamlinkTransport struct {
-	client  *retryablehttp.Client
-	Headers map[string]string
-}
-
-func (t *StreamlinkTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	for k, v := range t.Headers {
-		req.Header.Add(k, v)
-	}
-	return cleanhttp.DefaultTransport().RoundTrip(req)
-}
-
-func NewStreamlinkClient(headers map[string]string) *retryablehttp.Client {
-	client := retryablehttp.NewClient()
-	client.HTTPClient.Timeout = time.Minute
-	client.HTTPClient.Transport = &StreamlinkTransport{
-		client:  client,
-		Headers: headers,
-	}
-	client.Logger = nil
-
-	return client
-}
-
 type DownloadCog struct {
-	DiscordBotCog
+	GenericCog
+
+	qnapConfig *config.QNAPConfig
 }
 
-func (DownloadCog) String() string {
-	return "download"
-}
-
-func (c *DownloadCog) Setup(ctx context.Context, cfg *config.Config, wg *sync.WaitGroup) error {
-	c.DiscordBotCog.Setup(c, cfg, wg)
-	qnapConfig = cfg.QNAP
-
-	return nil
-}
-
-func (c *DownloadCog) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
-}
-
-func (DownloadCog) Commands() []Command {
-	return []Command{
-		&StreamlinkCommand{},
-		&DiskCommand{},
+func NewDownloadCog(cfg *config.Config, s *discord.Session) (Cog, error) {
+	c := &DownloadCog{
+		qnapConfig: cfg.QNAP,
 	}
+
+	c.allCommands = map[string]CommandFunc{
+		"disk":       c.Disk,
+		"streamlink": c.Streamlink,
+	}
+
+	return c, nil
 }
 
-type DiskCommand struct{}
-
-func (DiskCommand) String() string {
-	return "disk"
-}
-
-func (c *DiskCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
+func (c *DownloadCog) Disk(ctx context.Context, s *discord.MessageSession, args []string) {
 	usage := du.NewDiskUsage(".")
 
-	_, err = session.ChannelMessageSend(channelID, fmt.Sprintf("Available space: %v", units.HumanSize(float64(usage.Free()))))
-	return err
+	s.SendMessage(fmt.Sprintf("Available space: %v", units.HumanSize(float64(usage.Free()))))
 }
 
-type StreamlinkCommand struct{}
+func (c *DownloadCog) Streamlink(ctx context.Context, s *discord.MessageSession, args []string) {
+	type Args struct {
+		HTTPHeader  string `short:"h" long:"header"`
+		HTTPCookies string `short:"c" long:"cookie"`
 
-func (StreamlinkCommand) String() string {
-	return "streamlink"
-}
-
-type StreamlinkCommandArgs struct {
-	HTTPHeader  string `short:"h" long:"header"`
-	HTTPCookies string `short:"c" long:"cookie"`
-
-	Args struct {
-		M3U8URLStr string `required:"yes"`
-		FileName   string `required:"yes"`
-	} `positional-args:"yes"`
-}
-
-func (c *StreamlinkCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
-	commandArgs := &StreamlinkCommandArgs{}
-	_, err = flags.NewParser(commandArgs, flags.IgnoreUnknown).ParseArgs(args)
-	if err != nil {
-		return err
+		Args struct {
+			M3U8URLStr string `required:"yes"`
+			FileName   string `required:"yes"`
+		} `positional-args:"yes"`
 	}
 
-	client := NewStreamlinkClient(parseHeaders(commandArgs))
-
-	m3u8Url, err := url.Parse(commandArgs.Args.M3U8URLStr)
+	commandArgs := &Args{}
+	_, err := flags.NewParser(commandArgs, flags.IgnoreUnknown).ParseArgs(args)
 	if err != nil {
-		return err
+		s.SendError(err)
+		return
 	}
 
-	var listType m3u8.ListType
-	defer func() {
-		if err != nil {
-			session.ChannelMessageSend(channelID, fmt.Sprintf("Failed to complete streamlink %s, error: %s", commandArgs.Args.FileName, err.Error()))
-			return
-		}
-
-		if listType == m3u8.MEDIA {
-			session.ChannelMessageSend(channelID, fmt.Sprintf("Successfully completed streamlink %s", commandArgs.Args.FileName))
-		}
-	}()
-
+	client := httpclient.NewClientWithHeadersAndCookiesStr(commandArgs.HTTPHeader, commandArgs.HTTPCookies)
 	resp, err := client.Get(commandArgs.Args.M3U8URLStr)
 	if err != nil {
-		return err
+		s.SendError(err)
+		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP request to %s returned status %v", resp.Request.URL.String(), resp.StatusCode)
+		s.SendErrorf("HTTP request to %s returned status %v", resp.Request.URL.String(), resp.StatusCode)
+		return
 	}
 
-	playlist, listType, err := m3u8.DecodeFrom(resp.Body, true)
+	genericPlaylist, _, err := m3u8.DecodeFrom(resp.Body, true)
 	if err != nil {
-		return err
+		s.SendError(err)
+		return
 	}
 
-	var downloadedRuns [][]string
-	switch listType {
-	case m3u8.MEDIA:
-		dir := fmt.Sprintf("%s-%s", time.Now().Format(consts.TimeFormatYYMMDDHHMMSS), channelID)
-		if err := os.Mkdir(dir, os.ModePerm); err != nil {
-			return err
-		}
-
-		mediaList := playlist.(*m3u8.MediaPlaylist)
-
-		session.ChannelMessageSend(channelID, fmt.Sprintf("Starting to download %s", commandArgs.Args.FileName))
-
-		downloadedRuns, err = handleMediaPlaylist(ctx, client, m3u8Url, mediaList.Key, dir, logger)
-		if err != nil {
-			return err
-		}
-	case m3u8.MASTER:
+	switch playlist := genericPlaylist.(type) {
+	case *m3u8.MasterPlaylist:
 		var bestVariant *m3u8.Variant
-		for _, variant := range playlist.(*m3u8.MasterPlaylist).Variants {
+		for _, variant := range playlist.Variants {
 			if bestVariant == nil || variant.Bandwidth > bestVariant.Bandwidth {
 				bestVariant = variant
 			}
 		}
 
+		m3u8Url, err := url.Parse(commandArgs.Args.M3U8URLStr)
+		if err != nil {
+			s.SendError(err)
+			return
+		}
+
 		mediaUrl, err := m3u8Url.Parse(bestVariant.URI)
 		if err != nil {
-			return err
+			s.SendError(err)
+			return
 		}
 
 		args[len(args)-2] = mediaUrl.String()
-		return c.Handle(ctx, session, channelID, args, logger)
-	default:
-		return fmt.Errorf("unknown M3U8 type %v", listType)
-	}
-
-	if qnapConfig.IsEnabled {
-		session.ChannelMessageSend(channelID, fmt.Sprintf("Stream closed, starting to upload %s", commandArgs.Args.FileName))
-
-		extension := path.Ext(commandArgs.Args.FileName)
-		fileName := strings.TrimSuffix(commandArgs.Args.FileName, extension)
-
-		if extension == "" {
-			extension = ".ts"
+		c.Streamlink(ctx, s, args)
+	case *m3u8.MediaPlaylist:
+		dir := fmt.Sprintf("%s-%s", time.Now().Format(consts.TimeFormatYYMMDDHHMMSS), s.ChannelID)
+		if err := os.Mkdir(dir, os.ModePerm); err != nil {
+			s.SendError(err)
+			return
 		}
 
-		if len(downloadedRuns) == 1 {
-			return uploadFile(fmt.Sprintf("%s%s", fileName, extension), downloadedRuns[0], logger)
-		} else {
-			wg := new(errgroup.Group)
-			for runNo, run := range downloadedRuns {
-				wg.Go(func() error {
-					return uploadFile(fmt.Sprintf("%s_%v%s", fileName, runNo+1, extension), run, logger)
-				})
+		s.SendMessage("Starting to download %s", commandArgs.Args.FileName)
 
-				if err := wg.Wait(); err != nil {
-					return err
-				}
+		downloadedRuns, err := handleMediaPlaylist(ctx, client, commandArgs.Args.M3U8URLStr, playlist.Key, dir, s.Logger)
+		if err != nil {
+			s.SendError(err)
+			return
+		}
+
+		if c.qnapConfig.IsEnabled {
+			s.SendMessage("Stream closed, starting to upload %s", commandArgs.Args.FileName)
+
+			if err := handleUpload(c.qnapConfig, commandArgs.Args.FileName, downloadedRuns, s.Logger); err != nil {
+				s.SendError(err)
+				return
 			}
 		}
 	}
 
-	return nil
 }
 
 type DownloadedFile struct {
@@ -221,9 +147,26 @@ type DownloadedFile struct {
 	SeqNo int
 }
 
-func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8Url *url.URL, key *m3u8.Key, dir string, logger *zap.SugaredLogger) (downloadRuns [][]string, err error) {
+type PlaylistConfig struct {
+	Directory   string
+	IsEncrypted bool
+	Block       cipher.Block
+}
+
+type Segment struct {
+	FileName string
+	URL      *url.URL
+	IV       []byte
+}
+
+func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8UrlStr string, key *m3u8.Key, dir string, logger *zap.SugaredLogger) (downloadRuns [][]string, err error) {
 	isEncrypted := key != nil
 	currRunNo := 0
+
+	m3u8Url, err := url.Parse(m3u8UrlStr)
+	if err != nil {
+		return nil, err
+	}
 
 	var block cipher.Block
 	if isEncrypted {
@@ -234,7 +177,6 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 
 		block, err = aes.NewCipher(keyBytes)
 		if err != nil {
-			logger.Error(err)
 			return nil, err
 		}
 	}
@@ -384,28 +326,6 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 	}
 }
 
-func parseHeaders(args *StreamlinkCommandArgs) map[string]string {
-	headers := make(map[string]string)
-	if args.HTTPHeader != "" {
-		headerList := strings.Split(args.HTTPHeader, ";")
-		for _, header := range headerList {
-			headerKeyVal := strings.Split(header, "=")
-			if len(headerKeyVal) != 2 {
-				continue
-			}
-
-			key, val := headerKeyVal[0], headerKeyVal[1]
-			headers[key] = val
-		}
-	}
-
-	if args.HTTPCookies != "" {
-		headers["Cookie"] = args.HTTPCookies
-	}
-
-	return headers
-}
-
 func downloadKey(ctx context.Context, client *retryablehttp.Client, m3u8Url *url.URL, key *m3u8.Key) ([]byte, error) {
 	keyUrl, err := m3u8Url.Parse(key.URI)
 	if err != nil {
@@ -423,18 +343,6 @@ func downloadKey(ctx context.Context, client *retryablehttp.Client, m3u8Url *url
 	}
 
 	return io.ReadAll(resp.Body)
-}
-
-type PlaylistConfig struct {
-	Directory   string
-	IsEncrypted bool
-	Block       cipher.Block
-}
-
-type Segment struct {
-	FileName string
-	URL      *url.URL
-	IV       []byte
 }
 
 func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryablehttp.Client, segmentChan <-chan *Segment, logger *zap.SugaredLogger) {
@@ -496,11 +404,28 @@ func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryable
 	}
 }
 
-func uploadFile(fileName string, filePaths []string, logger *zap.SugaredLogger) error {
-	if !qnapConfig.IsEnabled {
-		return nil
+func handleUpload(qnapConfig *config.QNAPConfig, fileNameStr string, downloadedRuns [][]string, logger *zap.SugaredLogger) error {
+	extension := path.Ext(fileNameStr)
+	fileName := strings.TrimSuffix(fileNameStr, extension)
+
+	if extension == "" {
+		extension = ".ts"
 	}
 
+	if len(downloadedRuns) == 1 {
+		return uploadFile(qnapConfig, fmt.Sprintf("%s%s", fileName, extension), downloadedRuns[0], logger)
+	} else {
+		for runNo, run := range downloadedRuns {
+			runFileName := fmt.Sprintf("%s_%v%s", fileName, runNo+1, extension)
+			if err := uploadFile(qnapConfig, runFileName, run, logger); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func uploadFile(qnapConfig *config.QNAPConfig, fileName string, filePaths []string, logger *zap.SugaredLogger) error {
 	qnapAPI, err := qnap.New(qnapConfig.URL, logger)
 	if err != nil {
 		return err

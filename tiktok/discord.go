@@ -7,23 +7,22 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/consts"
+	"github.com/xIceArcher/go-leah/discord"
 	"github.com/xIceArcher/go-leah/utils"
 )
 
-func (v *Video) GetDiscordMessages(maxMessageBytes int64) []*discordgo.MessageSend {
-	messages := make([]*discordgo.MessageSend, 0, 2)
-
+func (v *Video) GetEmbed() *discordgo.MessageEmbed {
 	textWithEntities := &utils.TextWithEntities{Text: v.Description}
 	textWithEntities.AddEntities(func(u *utils.Entity) string {
-		return utils.GetDiscordNamedLink(u.Match, GetTagURL(u.Match[1:]))
+		return discord.GetNamedLink(u.Match, GetTagURL(u.Match[1:]))
 	}, v.Tags...)
 	textWithEntities.AddEntities(func(u *utils.Entity) string {
-		return utils.GetDiscordNamedLink(u.Match, GetMentionURL(u.Match[1:]))
+		return discord.GetNamedLink(u.Match, GetMentionURL(u.Match[1:]))
 	}, v.Mentions...)
 
 	segmentedText := textWithEntities.GetReplacedText(4096, 1)
 
-	embed := &discordgo.MessageEmbed{
+	return &discordgo.MessageEmbed{
 		URL:   v.URL(),
 		Title: fmt.Sprintf("Video by %s", v.Author.Nickname),
 		Author: &discordgo.MessageEmbedAuthor{
@@ -36,7 +35,7 @@ func (v *Video) GetDiscordMessages(maxMessageBytes int64) []*discordgo.MessageSe
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Music",
-				Value: utils.GetDiscordNamedLink(v.Music.String(), v.Music.URL()),
+				Value: discord.GetNamedLink(v.Music.String(), v.Music.URL()),
 			},
 			{
 				Name:   "Likes",
@@ -60,12 +59,4 @@ func (v *Video) GetDiscordMessages(maxMessageBytes int64) []*discordgo.MessageSe
 		},
 		Timestamp: v.CreateTime.Format(time.RFC3339),
 	}
-
-	messages = append(messages, &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{embed},
-	})
-
-	messages = append(messages, utils.DownloadVideo(v.VideoURL, v.ID, maxMessageBytes))
-
-	return messages
 }

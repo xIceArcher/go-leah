@@ -51,6 +51,14 @@ func (t *Tweet) DisplayText() string {
 	return t.Text
 }
 
+func (t *Tweet) GetBaseID() string {
+	if t.IsRetweet {
+		return t.RetweetedStatus.ID
+	}
+
+	return t.ID
+}
+
 type User struct {
 	ID              string
 	Name            string

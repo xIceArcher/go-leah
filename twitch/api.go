@@ -42,7 +42,7 @@ func NewAPI(cfg *config.TwitchConfig) (*API, error) {
 	return &API{}, err
 }
 
-func (API) GetStream(loginName string) (*helix.Stream, error) {
+func (a *API) GetStream(loginName string) (*Stream, error) {
 	streams, err := api.GetStreams(&helix.StreamsParams{
 		UserLogins: []string{loginName},
 	})
@@ -53,10 +53,24 @@ func (API) GetStream(loginName string) (*helix.Stream, error) {
 		return nil, ErrNotFound
 	}
 
-	return &streams.Data.Streams[0], nil
+	user, err := a.GetUser(loginName)
+	if err != nil {
+		user = &User{}
+	}
+
+	stream := streams.Data.Streams[0]
+	return &Stream{
+		Title:        stream.Title,
+		ThumbnailURL: a.FormatThumbnailURL(stream.ThumbnailURL, 1920, 1080),
+
+		User: user,
+
+		ViewerCount: stream.ViewerCount,
+		StartedAt:   stream.StartedAt,
+	}, nil
 }
 
-func (API) GetUser(loginName string) (*helix.User, error) {
+func (API) GetUser(loginName string) (*User, error) {
 	users, err := api.GetUsers(&helix.UsersParams{
 		Logins: []string{loginName},
 	})
@@ -67,7 +81,13 @@ func (API) GetUser(loginName string) (*helix.User, error) {
 		return nil, ErrNotFound
 	}
 
-	return &users.Data.Users[0], nil
+	user := users.Data.Users[0]
+	return &User{
+		LoginName:       user.Login,
+		Name:            user.DisplayName,
+		ProfileImageURL: user.ProfileImageURL,
+	}, nil
+
 }
 
 func (API) FormatThumbnailURL(url string, width int, height int) string {

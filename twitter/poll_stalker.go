@@ -2,6 +2,7 @@ package twitter
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -12,14 +13,19 @@ import (
 type PollStalker struct {
 	*twitterStalker
 
-	ctx            context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+
+	isStarted bool
+
 	api            API
 	userCancelFunc map[string]context.CancelFunc
 
 	PollInterval time.Duration
 }
 
-func NewPollStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.WaitGroup, api API, logger *zap.SugaredLogger) *PollStalker {
+func NewPollStalker(cfg *config.TwitterConfig, api API, logger *zap.SugaredLogger) *PollStalker {
 	pollIntervalMins := cfg.PollIntervalMins
 	if cfg.PollIntervalMins == 0 {
 		pollIntervalMins = 5
@@ -28,17 +34,27 @@ func NewPollStalker(ctx context.Context, cfg *config.TwitterConfig, wg *sync.Wai
 	stalker := &PollStalker{
 		twitterStalker: newTwitterStalker(logger),
 
-		ctx:            ctx,
 		api:            api,
 		userCancelFunc: make(map[string]context.CancelFunc),
 
 		PollInterval: time.Duration(pollIntervalMins) * time.Minute,
 	}
 
-	go stalker.RestartTask(ctx, wg)
-	go stalker.CleanupTask(ctx, wg)
-
 	return stalker
+}
+
+func (s *PollStalker) Start() error {
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	for userID := range s.twitterStalker.userIDs {
+		if err := s.startStalk(userID); err != nil {
+			return err
+		}
+	}
+
+	go s.restartTask(s.ctx)
+
+	s.isStarted = true
+	return nil
 }
 
 func (s *PollStalker) AddUsers(userIDs ...string) error {
@@ -47,15 +63,11 @@ func (s *PollStalker) AddUsers(userIDs ...string) error {
 			continue
 		}
 
-		sinceID, err := s.api.GetLastTweetID(userID)
-		if err != nil {
-			return err
+		if s.isStarted {
+			if err := s.startStalk(userID); err != nil {
+				return err
+			}
 		}
-
-		ctx, cancel := context.WithCancel(s.ctx)
-		s.userCancelFunc[userID] = cancel
-
-		go s.PollTask(ctx, userID, sinceID)
 	}
 
 	return s.twitterStalker.AddUsers(userIDs...)
@@ -67,18 +79,48 @@ func (s *PollStalker) RemoveUsers(userIDs ...string) error {
 			continue
 		}
 
-		cancelFunc := s.userCancelFunc[userID]
-		delete(s.userCancelFunc, userID)
-
-		cancelFunc()
+		if s.isStarted {
+			if err := s.stopStalk(userID); err != nil {
+				return err
+			}
+		}
 	}
 
 	return s.twitterStalker.RemoveUsers(userIDs...)
 }
 
-func (s *PollStalker) RestartTask(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(1)
-	defer wg.Done()
+func (s *PollStalker) Stop() {
+	s.cancel()
+	s.wg.Wait()
+}
+
+func (s *PollStalker) startStalk(userID string) error {
+	sinceID, err := s.api.GetLastTweetID(userID)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithCancel(s.ctx)
+	s.userCancelFunc[userID] = cancel
+
+	go s.pollTask(ctx, userID, sinceID)
+	return nil
+}
+
+func (s *PollStalker) stopStalk(userID string) error {
+	cancelFunc, ok := s.userCancelFunc[userID]
+	if !ok {
+		return fmt.Errorf("stalk cancel func not found")
+	}
+
+	delete(s.userCancelFunc, userID)
+	cancelFunc()
+	return nil
+}
+
+func (s *PollStalker) restartTask(ctx context.Context) {
+	s.wg.Add(1)
+	defer s.wg.Done()
 
 	for {
 		select {
@@ -91,7 +133,10 @@ func (s *PollStalker) RestartTask(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (s *PollStalker) PollTask(ctx context.Context, userID string, sinceID string) {
+func (s *PollStalker) pollTask(ctx context.Context, userID string, sinceID string) {
+	s.wg.Add(1)
+	defer s.wg.Done()
+
 	logger := s.logger.With(zap.String("userID", userID))
 
 	for {
@@ -115,15 +160,5 @@ func (s *PollStalker) PollTask(ctx context.Context, userID string, sinceID strin
 
 			sinceID = tweets[0].ID
 		}
-	}
-}
-
-func (s *PollStalker) CleanupTask(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(1)
-	defer wg.Done()
-
-	<-ctx.Done()
-	for _, cancelFunc := range s.userCancelFunc {
-		cancelFunc()
 	}
 }

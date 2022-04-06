@@ -3,9 +3,12 @@ package twitter
 import "go.uber.org/zap"
 
 type Stalker interface {
+	Start() error
+	Restart() error
+	Stop()
+
 	AddUsers(userIDs ...string) error
 	RemoveUsers(userIDs ...string) error
-	Restart() error
 	IsStalkingUser(userID string) bool
 
 	OutCh() <-chan *Tweet
@@ -15,6 +18,7 @@ type twitterStalker struct {
 	userIDs map[string]struct{}
 	outCh   chan *Tweet
 
+	isStarted    bool
 	restartCh    chan int
 	restartErrCh chan error
 
@@ -44,7 +48,7 @@ func (s *twitterStalker) AddUsers(userIDs ...string) error {
 		s.userIDs[userID] = struct{}{}
 	}
 
-	if shouldRestart {
+	if shouldRestart && s.isStarted {
 		s.Restart()
 	}
 
@@ -62,7 +66,7 @@ func (s *twitterStalker) RemoveUsers(userIDs ...string) error {
 		delete(s.userIDs, userID)
 	}
 
-	if shouldRestart {
+	if shouldRestart && s.isStarted {
 		s.Restart()
 	}
 

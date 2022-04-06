@@ -14,6 +14,10 @@ type CombinedStalker struct {
 	sentTweetIDToCount sync.Map
 	timeout            time.Duration
 
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+
 	restartLock     sync.Mutex
 	lastRestartTime time.Time
 
@@ -21,8 +25,8 @@ type CombinedStalker struct {
 	logger *zap.SugaredLogger
 }
 
-func NewCombinedStalker(ctx context.Context, cfg *config.TwitterConfig, stalkers []Stalker, logger *zap.SugaredLogger) *CombinedStalker {
-	s := &CombinedStalker{
+func NewCombinedStalker(cfg *config.TwitterConfig, stalkers []Stalker, logger *zap.SugaredLogger) *CombinedStalker {
+	return &CombinedStalker{
 		stalkers: stalkers,
 		timeout:  time.Duration(cfg.StalkerTimeoutMins) * time.Minute,
 
@@ -31,9 +35,18 @@ func NewCombinedStalker(ctx context.Context, cfg *config.TwitterConfig, stalkers
 		outCh:  make(chan *Tweet),
 		logger: logger,
 	}
+}
 
-	s.StartReadChTask()
-	return s
+func (s *CombinedStalker) Start() error {
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	for _, stalker := range s.stalkers {
+		if err := stalker.Start(); err != nil {
+			return err
+		}
+
+		go s.readSingleStalkerChTask(s.ctx, stalker)
+	}
+	return nil
 }
 
 func (s *CombinedStalker) AddUsers(userIDs ...string) (err error) {
@@ -83,35 +96,51 @@ func (s *CombinedStalker) OutCh() <-chan *Tweet {
 	return s.outCh
 }
 
-func (s *CombinedStalker) StartReadChTask() {
-	for i := range s.stalkers {
-		go s.ReadSingleStalkerChTask(i)
-	}
-}
+func (s *CombinedStalker) readSingleStalkerChTask(ctx context.Context, stalker Stalker) {
+	s.wg.Add(1)
+	defer s.wg.Done()
 
-func (s *CombinedStalker) ReadSingleStalkerChTask(i int) {
-	stalker := s.stalkers[i]
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case tweet := <-stalker.OutCh():
+			cnt, ok := s.sentTweetIDToCount.Load(tweet.ID)
+			if ok {
+				s.sentTweetIDToCount.Store(tweet.ID, cnt.(int)+1)
+			} else {
+				s.sentTweetIDToCount.Store(tweet.ID, 1)
+				s.outCh <- tweet
 
-	for tweet := range stalker.OutCh() {
-		cnt, ok := s.sentTweetIDToCount.Load(tweet.ID)
-		if ok {
-			s.sentTweetIDToCount.Store(tweet.ID, cnt.(int)+1)
-		} else {
-			s.sentTweetIDToCount.Store(tweet.ID, 1)
-			s.outCh <- tweet
-
-			go s.MonitorTweetCountTask(tweet.ID)
+				go s.monitorTweetCountTask(ctx, tweet.ID)
+			}
 		}
 	}
 }
 
-func (s *CombinedStalker) MonitorTweetCountTask(tweetID string) {
-	time.Sleep(s.timeout)
+func (s *CombinedStalker) monitorTweetCountTask(ctx context.Context, tweetID string) {
+	s.wg.Add(1)
+	defer s.wg.Done()
 
-	cnt, ok := s.sentTweetIDToCount.Load(tweetID)
-	if ok && cnt.(int) < len(s.stalkers) {
-		s.Restart()
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(s.timeout):
+		cnt, ok := s.sentTweetIDToCount.Load(tweetID)
+		if ok && cnt.(int) < len(s.stalkers) {
+			s.Restart()
+		}
+
+		s.sentTweetIDToCount.Delete(tweetID)
+	}
+}
+
+func (s *CombinedStalker) Stop() {
+	s.cancel()
+
+	for _, stalker := range s.stalkers {
+		stalker.Stop()
 	}
 
-	s.sentTweetIDToCount.Delete(tweetID)
+	s.wg.Wait()
 }

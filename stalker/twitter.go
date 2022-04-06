@@ -12,6 +12,7 @@ import (
 	"github.com/xIceArcher/go-leah/cache"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/consts"
+	"github.com/xIceArcher/go-leah/discord"
 	"github.com/xIceArcher/go-leah/twitter"
 	"github.com/xIceArcher/go-leah/utils"
 	"go.uber.org/zap"
@@ -27,19 +28,23 @@ var (
 )
 
 type TweetStalkManager struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+
 	stalker twitter.Stalker
 	api     twitter.API
 
-	session *discordgo.Session
+	session *discord.Session
 	logger  *zap.SugaredLogger
 
 	cache cache.Cache
 
 	userToChannels   map[string]map[string]int
-	channelsToEmbeds map[string]map[string]*utils.UpdatableEmbeds
+	channelsToEmbeds map[string]map[string]discord.UpdatableMessageEmbeds
 }
 
-func NewTweetStalkManager(ctx context.Context, cfg *config.Config, session *discordgo.Session, wg *sync.WaitGroup, logger *zap.SugaredLogger) *TweetStalkManager {
+func NewTweetStalkManager(cfg *config.Config, session *discord.Session, logger *zap.SugaredLogger) *TweetStalkManager {
 	cache, err := cache.NewRedisCache(cfg.Redis)
 	if err != nil {
 		logger.With(zap.Error(err)).Error("Failed to initialize cache, stalks will only be saved in-memory")
@@ -47,28 +52,143 @@ func NewTweetStalkManager(ctx context.Context, cfg *config.Config, session *disc
 
 	api := twitter.NewCachedAPI(cfg.Twitter, cache, logger)
 
-	streamStalker := twitter.NewStreamStalker(ctx, cfg.Twitter, wg, api, logger)
-	pollStalker := twitter.NewPollStalker(ctx, cfg.Twitter, wg, api, logger)
+	streamStalker := twitter.NewStreamStalker(cfg.Twitter, api, logger)
+	pollStalker := twitter.NewPollStalker(cfg.Twitter, api, logger)
 
-	stalkManager := &TweetStalkManager{
-		stalker: twitter.NewCombinedStalker(ctx, cfg.Twitter, []twitter.Stalker{streamStalker, pollStalker}, logger),
+	return &TweetStalkManager{
+		stalker: twitter.NewCombinedStalker(cfg.Twitter, []twitter.Stalker{streamStalker, pollStalker}, logger),
 		api:     api,
 		session: session,
 		logger:  logger,
 		cache:   cache,
 
 		userToChannels:   make(map[string]map[string]int),
-		channelsToEmbeds: make(map[string]map[string]*utils.UpdatableEmbeds),
+		channelsToEmbeds: make(map[string]map[string]discord.UpdatableMessageEmbeds),
 	}
-
-	go stalkManager.HandleTweets(stalkManager.stalker.OutCh())
-	return stalkManager
 }
 
-func (t *TweetStalkManager) Resume(ctx context.Context) error {
-	keys, err := t.cache.GetByPrefixWithTTL(ctx, CacheKeyTweetStalkerPrefix)
+func (t *TweetStalkManager) Start() error {
+	t.ctx, t.cancel = context.WithCancel(context.Background())
+
+	if t.cache != nil {
+		if err := t.stalker.AddUsers(t.restoreUserIDsFromCache()...); err != nil {
+			return err
+		}
+	}
+
+	if err := t.stalker.Start(); err != nil {
+		return err
+	}
+
+	go t.handleTweetsTask(t.ctx, t.stalker.OutCh())
+	return nil
+}
+
+func (t *TweetStalkManager) Stalk(channelID string, screenName string, d time.Duration) error {
+	screenName = strings.TrimPrefix(screenName, "@")
+	logger := t.logger.With(zap.String("channelID", channelID)).With(zap.String("screenName", screenName))
+
+	user, err := t.api.GetUserByScreenName(screenName)
 	if err != nil {
 		return err
+	}
+
+	if err := t.stalker.AddUsers(user.ID); err != nil {
+		return err
+	}
+
+	if _, ok := t.userToChannels[user.ID]; !ok {
+		t.userToChannels[user.ID] = make(map[string]int)
+	}
+
+	colorInt := utils.ParseHexColor(consts.ColorNone)
+	t.userToChannels[user.ID][channelID] = colorInt
+	if err := t.cache.SetWithExpiry(t.ctx, getCacheKey(channelID, user.ID), colorInt, d); err != nil {
+		logger.With(zap.Error(err)).Error("Failed to set cache")
+	}
+
+	if d > 0 {
+		go t.autoUnstalkTask(t.ctx, channelID, screenName, d)
+	}
+
+	return nil
+}
+
+func (t *TweetStalkManager) Unstalk(channelID string, screenName string) error {
+	screenName = strings.TrimPrefix(screenName, "@")
+	logger := t.logger.With(zap.String("channelID", channelID)).With(zap.String("screenName", screenName))
+
+	user, err := t.api.GetUserByScreenName(screenName)
+	if err != nil {
+		return err
+	}
+
+	if channels, ok := t.userToChannels[user.ID]; ok {
+		delete(channels, channelID)
+		if len(channels) == 0 {
+			delete(t.userToChannels, user.ID)
+			t.stalker.RemoveUsers(user.ID)
+		}
+	}
+
+	if err := t.cache.Clear(t.ctx, getCacheKey(channelID, user.ID)); err != nil {
+		logger.With(zap.Error(err)).Error("Failed to clear cache")
+	}
+
+	return nil
+}
+
+func (t *TweetStalkManager) Stalks(channelID string) ([]string, error) {
+	userIDs := make([]string, 0)
+	for userID, channels := range t.userToChannels {
+		if _, ok := channels[channelID]; ok {
+			userIDs = append(userIDs, userID)
+		}
+	}
+
+	screenNames := make([]string, 0, len(userIDs))
+	for _, userID := range userIDs {
+		user, err := t.api.GetUser(userID)
+		if err != nil {
+			return nil, err
+		}
+		screenNames = append(screenNames, fmt.Sprintf("@%s", user.ScreenName))
+	}
+
+	return screenNames, nil
+}
+
+func (t *TweetStalkManager) Color(channelID string, screenName string, color int) error {
+	user, err := t.api.GetUserByScreenName(screenName)
+	if err != nil {
+		return err
+	}
+
+	channels, ok := t.userToChannels[user.ID]
+	if !ok {
+		return ErrUserNotStalked
+	}
+
+	if _, ok := channels[channelID]; !ok {
+		return ErrUserNotStalked
+	}
+
+	channels[channelID] = color
+	return t.cache.SetKeepTTL(t.ctx, getCacheKey(channelID, user.ID), color)
+}
+
+func (t *TweetStalkManager) Stop() {
+	t.cancel()
+	t.stalker.Stop()
+
+	t.wg.Wait()
+}
+
+func (t *TweetStalkManager) restoreUserIDsFromCache() []string {
+	keys, err := t.cache.GetByPrefixWithTTL(t.ctx, CacheKeyTweetStalkerPrefix)
+	if err != nil {
+		t.logger.With(zap.Error(err)).Error("Failed to read keys from cache")
+		return nil
 	}
 
 	userIDs := make([]string, 0, len(keys))
@@ -107,70 +227,19 @@ func (t *TweetStalkManager) Resume(ctx context.Context) error {
 				continue
 			}
 
-			go t.autoUnstalk(ctx, channelID, user.ScreenName, val.TTL)
+			go t.autoUnstalkTask(t.ctx, channelID, user.ScreenName, val.TTL)
 		}
 
 		userIDs = append(userIDs, userID)
 	}
 
-	return t.stalker.AddUsers(userIDs...)
+	return userIDs
 }
 
-func (t *TweetStalkManager) Stalk(ctx context.Context, channelID string, screenName string, d time.Duration) error {
-	screenName = strings.TrimPrefix(screenName, "@")
-	logger := t.logger.With(zap.String("channelID", channelID)).With(zap.String("screenName", screenName))
+func (t *TweetStalkManager) autoUnstalkTask(ctx context.Context, channelID string, screenName string, d time.Duration) {
+	t.wg.Add(1)
+	defer t.wg.Done()
 
-	user, err := t.api.GetUserByScreenName(screenName)
-	if err != nil {
-		return err
-	}
-
-	if err := t.stalker.AddUsers(user.ID); err != nil {
-		return err
-	}
-
-	if _, ok := t.userToChannels[user.ID]; !ok {
-		t.userToChannels[user.ID] = make(map[string]int)
-	}
-
-	colorInt := utils.ParseHexColor(consts.ColorNone)
-	t.userToChannels[user.ID][channelID] = colorInt
-	if err := t.cache.SetWithExpiry(ctx, t.getCacheKey(channelID, user.ID), colorInt, d); err != nil {
-		logger.With(zap.Error(err)).Error("Failed to set cache")
-	}
-
-	if d > 0 {
-		go t.autoUnstalk(ctx, channelID, screenName, d)
-	}
-
-	return nil
-}
-
-func (t *TweetStalkManager) Unstalk(ctx context.Context, channelID string, screenName string) error {
-	screenName = strings.TrimPrefix(screenName, "@")
-	logger := t.logger.With(zap.String("channelID", channelID)).With(zap.String("screenName", screenName))
-
-	user, err := t.api.GetUserByScreenName(screenName)
-	if err != nil {
-		return err
-	}
-
-	if channels, ok := t.userToChannels[user.ID]; ok {
-		delete(channels, channelID)
-		if len(channels) == 0 {
-			delete(t.userToChannels, user.ID)
-			t.stalker.RemoveUsers(user.ID)
-		}
-	}
-
-	if err := t.cache.Clear(ctx, t.getCacheKey(channelID, user.ID)); err != nil {
-		logger.With(zap.Error(err)).Error("Failed to clear cache")
-	}
-
-	return nil
-}
-
-func (t *TweetStalkManager) autoUnstalk(ctx context.Context, channelID string, screenName string, d time.Duration) {
 	logger := t.logger.With(zap.String("channelID", channelID)).With(zap.String("screenName", screenName))
 
 	select {
@@ -178,114 +247,79 @@ func (t *TweetStalkManager) autoUnstalk(ctx context.Context, channelID string, s
 		return
 	case <-time.After(d):
 		logger.Info("Auto-unstalking...")
-		if err := t.Unstalk(ctx, channelID, screenName); err != nil {
+		if err := t.Unstalk(channelID, screenName); err != nil {
 			logger.With(zap.Error(err)).Error("Failed to unstalk")
 		}
-		if _, err := t.session.ChannelMessageSend(channelID, fmt.Sprintf("Unstalked @%s in this channel!", screenName)); err != nil {
-			logger.With(zap.Error(err)).Error("Failed to send unstalk message")
-		}
+
+		t.session.SendMessage(channelID, fmt.Sprintf("Unstalked @%s in this channel!", screenName))
 	}
 }
 
-func (t *TweetStalkManager) Stalks(ctx context.Context, channelID string) ([]string, error) {
-	userIDs := make([]string, 0)
-	for userID, channels := range t.userToChannels {
-		if _, ok := channels[channelID]; ok {
-			userIDs = append(userIDs, userID)
-		}
-	}
+func (t *TweetStalkManager) handleTweetsTask(ctx context.Context, ch <-chan *twitter.Tweet) {
+	t.wg.Add(1)
+	defer t.wg.Done()
 
-	screenNames := make([]string, 0, len(userIDs))
-	for _, userID := range userIDs {
-		user, err := t.api.GetUser(userID)
-		if err != nil {
-			return nil, err
-		}
-		screenNames = append(screenNames, fmt.Sprintf("@%s", user.ScreenName))
-	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case tweet := <-ch:
+			if channelIDs, ok := t.userToChannels[tweet.User.ID]; ok {
+				logger := t.logger.With(zap.String("tweetURL", tweet.URL()))
+				embeds := tweet.GetEmbeds()
 
-	return screenNames, nil
-}
+				for channelID, color := range channelIDs {
+					logger := logger.With(zap.String("channelID", channelID))
 
-func (t *TweetStalkManager) Color(ctx context.Context, channelID string, screenName string, color int) error {
-	user, err := t.api.GetUserByScreenName(screenName)
-	if err != nil {
-		return err
-	}
+					if _, ok := t.channelsToEmbeds[channelID]; !ok {
+						t.channelsToEmbeds[channelID] = make(map[string]discord.UpdatableMessageEmbeds)
+					}
 
-	channels, ok := t.userToChannels[user.ID]
-	if !ok {
-		return ErrUserNotStalked
-	}
-
-	if _, ok := channels[channelID]; !ok {
-		return ErrUserNotStalked
-	}
-
-	channels[channelID] = color
-	return t.cache.SetKeepTTL(ctx, t.getCacheKey(channelID, user.ID), color)
-}
-
-func (t *TweetStalkManager) HandleTweets(ch <-chan *twitter.Tweet) {
-	for tweet := range ch {
-		if channelIDs, ok := t.userToChannels[tweet.User.ID]; ok {
-			logger := t.logger.With(zap.String("tweetURL", tweet.URL()))
-			embeds := tweet.GetEmbeds()
-
-			for channelID, color := range channelIDs {
-				logger := logger.With(zap.String("channelID", channelID))
-
-				if _, ok := t.channelsToEmbeds[channelID]; !ok {
-					t.channelsToEmbeds[channelID] = make(map[string]*utils.UpdatableEmbeds)
-				}
-
-				if !t.isTweetRelevant(tweet, channelID) {
-					continue
-				}
-
-				if tweet.IsRetweet {
-					if existingEmbeds, ok := t.channelsToEmbeds[channelID][tweet.RetweetedStatus.ID]; ok {
-						t.HandleRetweet(existingEmbeds, tweet, logger)
+					if !t.isTweetRelevant(tweet, channelID) {
 						continue
 					}
-				}
 
-				for _, embed := range embeds {
-					embed.Color = color
-				}
-
-				updatableEmbeds := utils.NewEmbeds(t.session, embeds)
-				if err := updatableEmbeds.Send(channelID); err != nil {
-					logger.With(zap.Error(err)).Error("Failed to send embed")
-					continue
-				}
-
-				if tweet.HasVideo {
-					if _, err := t.session.ChannelMessageSend(channelID, tweet.VideoURL); err != nil {
-						logger.With(zap.Error(err)).Error("Failed to send video")
+					if tweet.IsRetweet {
+						if existingEmbeds, ok := t.channelsToEmbeds[channelID][tweet.RetweetedStatus.ID]; ok {
+							t.handleRetweet(existingEmbeds, tweet, logger)
+							continue
+						}
 					}
-				}
 
-				t.channelsToEmbeds[channelID][t.getBaseTweetID(tweet)] = updatableEmbeds
-				logger.Info("Sent tweet")
+					for _, embed := range embeds {
+						embed.Color = color
+					}
+
+					updatableEmbeds, err := t.session.SendEmbeds(channelID, embeds)
+					if err != nil {
+						logger.With(zap.Error(err)).Error("Failed to send embed")
+						continue
+					}
+
+					if tweet.HasVideo {
+						t.session.SendVideo(channelID, tweet.VideoURL, tweet.ID)
+					}
+
+					t.channelsToEmbeds[channelID][tweet.GetBaseID()] = updatableEmbeds
+					logger.Info("Sent tweet")
+				}
 			}
 		}
-
 	}
 }
 
-func (t *TweetStalkManager) HandleRetweet(embeds *utils.UpdatableEmbeds, tweet *twitter.Tweet, logger *zap.SugaredLogger) {
-	originalTimeStr := embeds.Embeds[len(embeds.Embeds)-1].Timestamp
+func (t *TweetStalkManager) handleRetweet(embeds discord.UpdatableMessageEmbeds, tweet *twitter.Tweet, logger *zap.SugaredLogger) {
+	originalTimeStr := embeds[len(embeds)-1].Timestamp
 	originalTime, ok := utils.ParseISOTime(originalTimeStr)
 	if !ok {
 		logger.Errorf("Failed to parse timestamp %s", originalTimeStr)
 	}
 	d := tweet.Timestamp.Sub(originalTime)
 
-	retweetInfoStr := fmt.Sprintf("\n%s (%s later)", utils.GetDiscordNamedLink(tweet.User.Name, tweet.User.URL()), utils.FormatDuration(d))
+	retweetInfoStr := fmt.Sprintf("\n%s (%s later)", discord.GetNamedLink(tweet.User.Name, tweet.User.URL()), utils.FormatDuration(d))
 
 	found := false
-	for _, field := range embeds.Embeds[0].Fields {
+	for _, field := range embeds[0].Fields {
 		if field.Name == "Retweeted by" {
 			found = true
 			field.Value += retweetInfoStr
@@ -293,7 +327,7 @@ func (t *TweetStalkManager) HandleRetweet(embeds *utils.UpdatableEmbeds, tweet *
 	}
 
 	if !found {
-		embeds.Embeds[0].Fields = append(embeds.Embeds[0].Fields, &discordgo.MessageEmbedField{
+		embeds[0].Fields = append(embeds[0].Fields, &discordgo.MessageEmbedField{
 			Name:  "Retweeted by",
 			Value: retweetInfoStr,
 		})
@@ -323,14 +357,6 @@ func (t *TweetStalkManager) isTweetRelevant(tweet *twitter.Tweet, channelID stri
 	return true
 }
 
-func (t *TweetStalkManager) getBaseTweetID(tweet *twitter.Tweet) string {
-	if tweet.IsRetweet {
-		return tweet.RetweetedStatus.ID
-	}
-
-	return tweet.ID
-}
-
-func (t *TweetStalkManager) getCacheKey(channelID string, userID string) string {
+func getCacheKey(channelID string, userID string) string {
 	return fmt.Sprintf(CacheKeyTweetStalkerFormat, channelID, userID)
 }

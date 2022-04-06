@@ -32,6 +32,10 @@ func (v *Video) URL() string {
 	return fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID)
 }
 
+func (v *Video) IsActiveLivestream() bool {
+	return v.LiveStreamingDetails != nil && !v.IsDone
+}
+
 type Channel struct {
 	ID    string
 	Title string

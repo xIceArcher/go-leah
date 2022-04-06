@@ -15,21 +15,18 @@ var (
 	ErrNoStartTime   = errors.New("cannot parse start time")
 )
 
-func (v *Video) GetEmbed(onlyNotDone bool) (embed *discordgo.MessageEmbed, err error) {
+func (v *Video) GetEmbed() (embed *discordgo.MessageEmbed) {
 	if v.LiveStreamingDetails == nil {
-		return nil, ErrNotLiveStream
+		// TODO: Embed normal videos
+		return &discordgo.MessageEmbed{}
+	} else {
+		return v.getLivestreamEmbed()
 	}
+}
 
-	if onlyNotDone && v.IsDone {
-		return nil, ErrNotLiveStream
-	}
-
+func (v *Video) getLivestreamEmbed() *discordgo.MessageEmbed {
 	actualStart := v.LiveStreamingDetails.ActualStartTime
 	scheduledStart := v.LiveStreamingDetails.ScheduledStartTime
-
-	if actualStart.IsZero() && scheduledStart.IsZero() {
-		return nil, ErrNoStartTime
-	}
 
 	var startTime time.Time
 	if scheduledStart.IsZero() {
@@ -106,5 +103,5 @@ func (v *Video) GetEmbed(onlyNotDone bool) (embed *discordgo.MessageEmbed, err e
 			Text:    "YouTube",
 			IconURL: "https://cdn4.iconfinder.com/data/icons/social-media-2210/24/Youtube-512.png",
 		},
-	}, nil
+	}
 }

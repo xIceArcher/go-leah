@@ -8,6 +8,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/consts"
+	"github.com/xIceArcher/go-leah/discord"
 	"github.com/xIceArcher/go-leah/utils"
 )
 
@@ -71,7 +72,7 @@ func (t *Tweet) quotedMainEmbed() *discordgo.MessageEmbed {
 	embed.Fields = []*discordgo.MessageEmbedField{
 		{
 			Name: "Quote",
-			Value: utils.GetDiscordNamedLink(
+			Value: discord.GetNamedLink(
 				fmt.Sprintf("Quoted tweet by %s (@%s)", t.QuotedStatus.User.Name, t.QuotedStatus.User.ScreenName),
 				t.QuotedStatus.URL(),
 			) + "\n" + t.QuotedStatus.GetTextWithEmbeds(),
@@ -117,14 +118,14 @@ func (t *Tweet) GetTextWithEmbeds() string {
 	textWithEntities := utils.TextWithEntities{Text: t.Text}
 
 	textWithEntities.AddEntities(func(u *utils.Entity) string {
-		return utils.GetDiscordNamedLink(u.Match, fmt.Sprintf("https://twitter.com/hashtag/%s", u.Match[1:]))
+		return discord.GetNamedLink(u.Match, fmt.Sprintf("https://twitter.com/hashtag/%s", u.Match[1:]))
 	}, t.Hashtags...)
 
 	textWithEntities.AddEntities(func(u *utils.Entity) string {
 		if t.IsReply && strings.EqualFold(u.Match[1:], t.ReplyUser.ScreenName) {
 			return ""
 		}
-		return utils.GetDiscordNamedLink(u.Match, (&User{Name: u.Match}).URL())
+		return discord.GetNamedLink(u.Match, (&User{Name: u.Match}).URL())
 	}, t.UserMentions...)
 
 	textWithEntities.AddEntities(func(u *utils.Entity) string {

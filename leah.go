@@ -1,22 +1,18 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/zap"
-
 	"github.com/xIceArcher/go-leah/bot"
-	"github.com/xIceArcher/go-leah/cog"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/handler"
 	"github.com/xIceArcher/go-leah/logger"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -35,33 +31,43 @@ func main() {
 	logger := zap.S()
 	defer logger.Sync()
 
-	var wg sync.WaitGroup
-	defer wg.Wait()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	cogs, err := cog.SetupCogs(ctx, cfg, &wg, logger)
-	if err != nil {
-		logger.With(zap.Error(err)).Fatal("Failed to load cogs")
-	}
-
-	handlers, err := handler.SetupHandlers(ctx, cfg, &wg, logger)
-	if err != nil {
-		logger.With(zap.Error(err)).Fatal("Failed to load handlers")
-	}
-
-	bot, err := bot.New(cfg, cogs, handlers, discordgo.IntentsGuilds|discordgo.IntentsGuildMessages)
+	bot, err := bot.New(cfg, discordgo.IntentsGuilds|discordgo.IntentsGuildMessages, logger)
 	if err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to initialize bot")
 	}
+	defer logger.Info("Bot shut down")
 
-	if err := bot.Run(ctx); err != nil {
+	logger.Info("Starting bot...")
+	if err := bot.Start(); err != nil {
 		logger.With(zap.Error(err)).Fatal("Failed to start bot")
 	}
-	defer bot.Close()
+	defer bot.Stop()
+	logger.Info("Bot started")
+
+	logger.Info("Initializing command handler...")
+	commandHandler, err := handler.NewCommandHandler(cfg, bot.Session)
+	if err != nil {
+		logger.With(zap.Error(err)).Fatal("Failed to initialize command handler")
+	}
+	defer commandHandler.Stop()
+	logger.Info("Initialized command handler")
+
+	bot.AddHandler(commandHandler)
+
+	logger.Info("Initializing regex handler...")
+	regexHandler, err := handler.NewRegexHandler(cfg, bot.Session)
+	if err != nil {
+		logger.With(zap.Error(err)).Fatal("Failed to initialize regex handler")
+	}
+	defer regexHandler.Stop()
+	logger.Info("Initialized regex handler")
+
+	bot.AddHandler(regexHandler)
+
+	logger.Info("Bot running")
 
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM)
 	<-sc
+	logger.Info("Shutting down bot...")
 }

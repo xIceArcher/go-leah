@@ -6,58 +6,40 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
+	"github.com/xIceArcher/go-leah/discord"
 	"github.com/xIceArcher/go-leah/stalker"
 	"go.uber.org/zap"
 )
 
-var (
-	tweetStalkManager *stalker.TweetStalkManager
-)
-
 type TweetStalkCog struct {
-	config *config.Config
+	GenericCog
 
-	DiscordBotCog
+	tweetStalkManager *stalker.TweetStalkManager
 }
 
-func (TweetStalkCog) String() string {
-	return "tweetstalk"
-}
+func NewTweetStalkCog(cfg *config.Config, s *discord.Session) (Cog, error) {
+	c := &TweetStalkCog{}
 
-func (c *TweetStalkCog) Setup(ctx context.Context, cfg *config.Config, wg *sync.WaitGroup) error {
-	c.DiscordBotCog.Setup(c, cfg, wg)
-	c.config = cfg
-	c.wg = wg
-
-	return nil
-}
-
-func (c *TweetStalkCog) Resume(ctx context.Context, session *discordgo.Session, logger *zap.SugaredLogger) {
-	tweetStalkManager = stalker.NewTweetStalkManager(ctx, c.config, session, c.wg, logger)
-	tweetStalkManager.Resume(ctx)
-}
-
-func (TweetStalkCog) Commands() []Command {
-	return []Command{
-		&StalkCommand{},
-		&UnstalkCommand{},
-		&StalksCommand{},
-		&ColorCommand{},
+	c.allCommands = map[string]CommandFunc{
+		"stalk":   c.Stalk,
+		"unstalk": c.Unstalk,
+		"stalks":  c.Stalks,
+		"color":   c.Color,
 	}
+
+	c.tweetStalkManager = stalker.NewTweetStalkManager(cfg, s, zap.S())
+	if err := c.tweetStalkManager.Start(); err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
-type StalkCommand struct{}
-
-func (StalkCommand) String() string {
-	return "stalk"
-}
-
-func (StalkCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
+func (c *TweetStalkCog) Stalk(ctx context.Context, s *discord.MessageSession, args []string) {
 	durationStr := args[len(args)-1]
 
 	var screenNames []string
@@ -70,100 +52,72 @@ func (StalkCommand) Handle(ctx context.Context, session *discordgo.Session, chan
 	duration := time.Duration(durationInt) * time.Minute
 
 	for _, screenName := range screenNames {
-		err = tweetStalkManager.Stalk(ctx, channelID, screenName, duration)
+		err = c.tweetStalkManager.Stalk(s.ChannelID, screenName, duration)
 		if err != nil {
-			_, err = session.ChannelMessageSend(channelID, fmt.Sprintf("Failed to stalk @%s in this channel!", screenName))
-			return err
+			s.SendInternalErrorWithMessage(err, "Failed to stalk @%s in this channel!", screenName)
 		}
 
 		if durationInt == 0 {
-			_, err = session.ChannelMessageSend(channelID, fmt.Sprintf("Stalked @%s in this channel!", screenName))
+			s.SendMessage("Stalked @%s in this channel!", screenName)
 		} else {
-			_, err = session.ChannelMessageSend(channelID, fmt.Sprintf("Stalked @%s in this channel! Will auto-unstalk after %v minutes!", screenName, durationInt))
-		}
-
-		if err != nil {
-			return err
+			s.SendMessage("Stalked @%s in this channel! Will auto-unstalk after %v minutes!", screenName, durationInt)
 		}
 	}
-
-	return nil
 }
 
-type UnstalkCommand struct{}
-
-func (UnstalkCommand) String() string {
-	return "unstalk"
-}
-
-func (UnstalkCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
+func (c *TweetStalkCog) Unstalk(ctx context.Context, s *discord.MessageSession, args []string) {
 	for _, screenName := range args {
-		err = tweetStalkManager.Unstalk(ctx, channelID, screenName)
-		if err != nil {
-			_, err = session.ChannelMessageSend(channelID, fmt.Sprintf("Failed to unstalk @%s in this channel!", screenName))
-			return err
+		if err := c.tweetStalkManager.Unstalk(s.ChannelID, screenName); err != nil {
+			s.SendInternalErrorWithMessage(err, "Failed to unstalk @%s in this channel!", screenName)
+			return
 		}
 
-		_, err = session.ChannelMessageSend(channelID, fmt.Sprintf("Unstalked @%s in this channel!", screenName))
-		if err != nil {
-			return err
-		}
+		s.SendMessage("Unstalked @%s in this channel!", screenName)
 	}
 
-	return nil
 }
 
-type StalksCommand struct{}
-
-func (StalksCommand) String() string {
-	return "stalks"
-}
-
-func (StalksCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
-	screenNames, err := tweetStalkManager.Stalks(ctx, channelID)
+func (c *TweetStalkCog) Stalks(ctx context.Context, s *discord.MessageSession, args []string) {
+	screenNames, err := c.tweetStalkManager.Stalks(s.ChannelID)
 	if err != nil {
-		return err
+		s.SendInternalError(err)
+		return
 	}
 
 	if len(screenNames) == 0 {
-		_, err = session.ChannelMessageSend(channelID, "No users stalked in this channel!")
+		s.SendMessage("No users stalked in this channel!")
 	} else {
-		_, err = session.ChannelMessageSend(channelID, fmt.Sprintf("Users stalked in this channel: %s", strings.Join(screenNames, ", ")))
+		s.SendMessage("Users stalked in this channel: %s", strings.Join(screenNames, ", "))
 	}
-
-	return err
 }
 
-type ColorCommand struct{}
-
-func (ColorCommand) String() string {
-	return "color"
-}
-
-func (ColorCommand) Handle(ctx context.Context, session *discordgo.Session, channelID string, args []string, logger *zap.SugaredLogger) (err error) {
+func (c *TweetStalkCog) Color(ctx context.Context, s *discord.MessageSession, args []string) {
 	if len(args) < 2 {
-		session.ChannelMessageSend(channelID, "Insufficient arguments")
-		return nil
+		s.SendErrorf("Insufficient arguments")
+		return
 	}
 
 	screenName, colorStr := args[0], args[1]
 	colorInt, err := strconv.ParseInt(colorStr, 16, 0)
 	if err != nil {
-		session.ChannelMessageSend(channelID, fmt.Sprintf("Invalid color: %s", colorStr))
-		return nil
+		s.SendErrorf("Invalid color: %s", colorStr)
+		return
 	}
 
-	if err := tweetStalkManager.Color(ctx, channelID, screenName, int(colorInt)); errors.Is(err, stalker.ErrUserNotStalked) {
-		session.ChannelMessageSend(channelID, fmt.Sprintf("User @%s not stalked in this channel", screenName))
-		return nil
+	if err := c.tweetStalkManager.Color(s.ChannelID, screenName, int(colorInt)); errors.Is(err, stalker.ErrUserNotStalked) {
+		s.SendErrorf("User @%s not stalked in this channel", screenName)
+		return
 	} else if err != nil {
-		session.ChannelMessageSend(channelID, "Failed to set color")
-		return err
+		s.SendInternalError(err)
+		return
 	}
 
-	_, err = session.ChannelMessageSendEmbed(channelID, &discordgo.MessageEmbed{
+	s.SendEmbed(&discordgo.MessageEmbed{
 		Description: fmt.Sprintf("Set color for @%s", screenName),
 		Color:       int(colorInt),
 	})
-	return err
+}
+
+func (c *TweetStalkCog) Stop() {
+	c.tweetStalkManager.Stop()
 }
