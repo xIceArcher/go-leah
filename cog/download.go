@@ -181,7 +181,7 @@ func handleMediaPlaylist(ctx context.Context, s *discord.MessageSession, client 
 		}
 	}
 
-	bar, err := s.SendBytesProgressBar(0, "Downloading")
+	bar, err := s.SendBytesProgressBar(1, "Downloading")
 	if err != nil {
 		return nil, err
 	}
@@ -211,6 +211,7 @@ func handleMediaPlaylist(ctx context.Context, s *discord.MessageSession, client 
 	defer func() {
 		close(toHeadChan)
 		wg.Wait()
+		bar.Add(1)
 	}()
 
 	downloadedRuns := make([]map[int]string, 0)
