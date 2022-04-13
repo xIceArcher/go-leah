@@ -358,6 +358,9 @@ func downloadKey(ctx context.Context, client *retryablehttp.Client, m3u8Url *url
 }
 
 func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryablehttp.Client, segmentChan <-chan *Segment, bar *discord.ProgressBar, logger *zap.SugaredLogger) {
+	// Sleep to allow progress bar to populate first
+	time.Sleep(15 * time.Second)
+
 	for {
 		select {
 		case <-ctx.Done():
