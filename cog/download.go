@@ -187,7 +187,15 @@ func handleMediaPlaylist(ctx context.Context, s *discord.MessageSession, client 
 	}
 
 	var wg sync.WaitGroup
-	segmentUrlChan := make(chan *Segment, 10000)
+	toHeadChan := make(chan *Segment, 10000)
+	toGetChan := make(chan *Segment, 10000)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		getSegmentSize(ctx, client, toHeadChan, toGetChan, bar, s.Logger)
+	}()
+
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
@@ -196,12 +204,12 @@ func handleMediaPlaylist(ctx context.Context, s *discord.MessageSession, client 
 				Directory:   dir,
 				IsEncrypted: isEncrypted,
 				Block:       block,
-			}, client, segmentUrlChan, bar, s.Logger)
+			}, client, toGetChan, bar, s.Logger)
 		}()
 	}
 
 	defer func() {
-		close(segmentUrlChan)
+		close(toHeadChan)
 		wg.Wait()
 	}()
 
@@ -300,14 +308,7 @@ func handleMediaPlaylist(ctx context.Context, s *discord.MessageSession, client 
 						}
 					}
 
-					resp, err := client.Head(segmentUrl.String())
-					if err != nil || resp.StatusCode != http.StatusOK {
-						s.Logger.With(zap.Error(err)).Warn("Failed to HEAD segment URL")
-					} else {
-						bar.AddMax(resp.ContentLength)
-					}
-
-					segmentUrlChan <- &Segment{
+					toHeadChan <- &Segment{
 						FileName: fileName,
 						URL:      segmentUrl,
 						IV:       iv,
@@ -357,10 +358,30 @@ func downloadKey(ctx context.Context, client *retryablehttp.Client, m3u8Url *url
 	return io.ReadAll(resp.Body)
 }
 
-func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryablehttp.Client, segmentChan <-chan *Segment, bar *discord.ProgressBar, logger *zap.SugaredLogger) {
-	// Sleep to allow progress bar to populate first
-	time.Sleep(15 * time.Second)
+func getSegmentSize(ctx context.Context, client *retryablehttp.Client, in <-chan *Segment, out chan<- *Segment, bar *discord.ProgressBar, logger *zap.SugaredLogger) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case segment, ok := <-in:
+			if !ok {
+				close(out)
+				return
+			}
 
+			resp, err := client.Head(segment.URL.String())
+			if err != nil || resp.StatusCode != http.StatusOK {
+				logger.With(zap.Error(err)).Warn("Failed to HEAD segment URL")
+			} else {
+				bar.AddMax(resp.ContentLength)
+			}
+
+			out <- segment
+		}
+	}
+}
+
+func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryablehttp.Client, segmentChan <-chan *Segment, bar *discord.ProgressBar, logger *zap.SugaredLogger) {
 	for {
 		select {
 		case <-ctx.Done():

@@ -34,8 +34,9 @@ func NewBytesProgressBar(s *Session, m *discordgo.Message, totalBytes int64, des
 			progressbar.OptionThrottle(65*time.Millisecond),
 			progressbar.OptionShowCount(),
 			progressbar.OptionSetTheme(progressbar.Theme{
-				Saucer:        ":white_large_square:",
-				SaucerPadding: ":black_large_square:",
+				Saucer:        ":green_square:",
+				SaucerHead:    ":yellow_square:",
+				SaucerPadding: ":red_square:",
 				BarStart:      "|",
 				BarEnd:        "|",
 			}),
