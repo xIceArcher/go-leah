@@ -218,6 +218,16 @@ func (s *Session) sendVideos(channelID string, videoURLs []string, fileNamePrefi
 	}
 }
 
+func (s *Session) SendBytesProgressBar(channelID string, totalBytes int64, description ...string) (*ProgressBar, error) {
+	m, err := s.ChannelMessageSend(channelID, "Creating progress bar...")
+	if err != nil {
+		s.Logger.With(zap.Error(err)).Error("Failed to create progress bar")
+		return nil, err
+	}
+
+	return NewBytesProgressBar(s, m, totalBytes, description...), nil
+}
+
 func (s *Session) SendError(channelID string, errToSend error) {
 	if _, err := s.ChannelMessageSend(channelID, errToSend.Error()); err != nil {
 		s.Logger.With(zap.Error(err)).Error("Failed to send error message")
@@ -267,6 +277,10 @@ func (s *MessageSession) DownloadImageAndSendEmbed(embed *discordgo.MessageEmbed
 
 func (s *MessageSession) SendEmbeds(embeds []*discordgo.MessageEmbed) (UpdatableMessageEmbeds, error) {
 	return s.Session.SendEmbeds(s.ChannelID, embeds)
+}
+
+func (s *MessageSession) SendBytesProgressBar(totalBytes int64, description ...string) (*ProgressBar, error) {
+	return s.Session.SendBytesProgressBar(s.ChannelID, totalBytes, description...)
 }
 
 func (s *MessageSession) SendVideo(videoURL string, fileName string) {

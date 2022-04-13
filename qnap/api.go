@@ -12,13 +12,14 @@ import (
 
 	"github.com/docker/go-units"
 	"github.com/go-resty/resty/v2"
+	"github.com/xIceArcher/go-leah/progress"
 	"go.uber.org/zap"
 )
 
 type API interface {
 	Login(username string, password string) error
 	Logout() error
-	UploadMany(dir string, fileName string, filePaths []string) error
+	UploadMany(dir string, fileName string, filePaths []string, progressBar ...progress.Bar) error
 	GetFileSize(path string, fileName string) (int64, error)
 }
 
@@ -88,7 +89,12 @@ type FileInfo struct {
 	NumBytes int64
 }
 
-func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []string) error {
+func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []string, bar ...progress.Bar) error {
+	var progressBar progress.Bar
+	if len(bar) > 0 {
+		progressBar = bar[0]
+	}
+
 	if a.sessionID == "" {
 		return ErrNotLoggedIn
 	}
@@ -96,6 +102,10 @@ func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []stri
 	fileInfos, totalBytes, err := getFileSizes(filePaths)
 	if err != nil {
 		return err
+	}
+
+	if progressBar != nil {
+		progressBar.SetMax(totalBytes)
 	}
 
 	logger := a.logger.With(zap.String("fileName", fileName))
@@ -166,6 +176,9 @@ func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []stri
 			break
 		}
 
+		if progressBar != nil {
+			progressBar.Add(file.NumBytes)
+		}
 		logger.Infof("Uploaded fragment %v/%v", i+1, len(fileInfos))
 	}
 

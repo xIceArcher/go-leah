@@ -19,6 +19,7 @@ require (
 	github.com/relvacode/iso8601 v1.1.0
 	github.com/rickb777/date v1.16.1
 	github.com/ricochet2200/go-disk-usage/du v0.0.0-20210707232629-ac9918953285
+	github.com/schollz/progressbar/v3 v3.8.6
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.19.1
 	golang.org/x/exp v0.0.0-20220317015231-48e79f11773a
@@ -41,14 +42,18 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rickb777/plural v1.4.1 // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
-	golang.org/x/net v0.0.0-20211029224645-99673261e6eb // indirect
-	golang.org/x/sys v0.0.0-20211029165221-6e7872819dc8 // indirect
+	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
+	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
+	golang.org/x/sys v0.0.0-20220412071739-889880a91fd5 // indirect
+	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20211029142109-e255c875f7c7 // indirect

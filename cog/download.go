@@ -124,20 +124,20 @@ func (c *DownloadCog) Streamlink(ctx context.Context, s *discord.MessageSession,
 
 		s.SendMessage("Starting to download %s", commandArgs.Args.FileName)
 
-		downloadedRuns, err := handleMediaPlaylist(ctx, client, commandArgs.Args.M3U8URLStr, playlist.Key, dir, s.Logger)
+		downloadedRuns, err := handleMediaPlaylist(ctx, s, client, commandArgs.Args.M3U8URLStr, playlist.Key, dir)
 		if err != nil {
 			s.SendError(err)
 			return
 		}
 
 		if c.qnapConfig.IsEnabled {
-			s.SendMessage("Stream closed, starting to upload %s", commandArgs.Args.FileName)
-
-			if err := handleUpload(c.qnapConfig, commandArgs.Args.FileName, downloadedRuns, s.Logger); err != nil {
+			if err := handleUpload(c.qnapConfig, s, commandArgs.Args.FileName, downloadedRuns); err != nil {
 				s.SendError(err)
 				return
 			}
 		}
+
+		c.Disk(ctx, s, []string{})
 	}
 
 }
@@ -159,7 +159,7 @@ type Segment struct {
 	IV       []byte
 }
 
-func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8UrlStr string, key *m3u8.Key, dir string, logger *zap.SugaredLogger) (downloadRuns [][]string, err error) {
+func handleMediaPlaylist(ctx context.Context, s *discord.MessageSession, client *retryablehttp.Client, m3u8UrlStr string, key *m3u8.Key, dir string) (downloadRuns [][]string, err error) {
 	isEncrypted := key != nil
 	currRunNo := 0
 
@@ -181,6 +181,11 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 		}
 	}
 
+	bar, err := s.SendBytesProgressBar(0, "Downloading")
+	if err != nil {
+		return nil, err
+	}
+
 	var wg sync.WaitGroup
 	segmentUrlChan := make(chan *Segment, 10000)
 	for i := 0; i < 2; i++ {
@@ -191,7 +196,7 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 				Directory:   dir,
 				IsEncrypted: isEncrypted,
 				Block:       block,
-			}, client, segmentUrlChan, logger)
+			}, client, segmentUrlChan, bar, s.Logger)
 		}()
 	}
 
@@ -211,10 +216,10 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("Context cancelled, download aborted")
+			s.Logger.Info("Context cancelled, download aborted")
 			return nil, nil
 		case <-doneCh:
-			logger.Info("Stream closed")
+			s.Logger.Info("Stream closed")
 			runs := make([][]*DownloadedFile, 0, len(downloadedRuns))
 			for runNo, runSegments := range downloadedRuns {
 				runs = append(runs, make([]*DownloadedFile, 0, len(runSegments)))
@@ -295,6 +300,13 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 						}
 					}
 
+					resp, err := client.Head(segmentUrl.String())
+					if err != nil || resp.StatusCode != http.StatusOK {
+						s.Logger.With(zap.Error(err)).Warn("Failed to HEAD segment URL")
+					} else {
+						bar.AddMax(resp.ContentLength)
+					}
+
 					segmentUrlChan <- &Segment{
 						FileName: fileName,
 						URL:      segmentUrl,
@@ -310,11 +322,11 @@ func handleMediaPlaylist(ctx context.Context, client *retryablehttp.Client, m3u8
 
 				return nil
 			}(); err != nil {
-				logger.With(zap.Int("errCount", errCount)).Error(err)
+				s.Logger.With(zap.Int("errCount", errCount)).Error(err)
 				errCount++
 
 				if errCount >= 10 {
-					logger.Error("Too many errors when getting M3U8, aborting...")
+					s.Logger.Error("Too many errors when getting M3U8, aborting...")
 					doneCh <- 1
 				}
 
@@ -345,7 +357,7 @@ func downloadKey(ctx context.Context, client *retryablehttp.Client, m3u8Url *url
 	return io.ReadAll(resp.Body)
 }
 
-func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryablehttp.Client, segmentChan <-chan *Segment, logger *zap.SugaredLogger) {
+func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryablehttp.Client, segmentChan <-chan *Segment, bar *discord.ProgressBar, logger *zap.SugaredLogger) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -380,6 +392,7 @@ func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryable
 					if err != nil {
 						return err
 					}
+					bar.Add(int64(len(bytes)))
 
 					if cfg.IsEncrypted {
 						mode := cipher.NewCBCDecrypter(cfg.Block, segment.IV)
@@ -404,7 +417,7 @@ func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryable
 	}
 }
 
-func handleUpload(qnapConfig *config.QNAPConfig, fileNameStr string, downloadedRuns [][]string, logger *zap.SugaredLogger) error {
+func handleUpload(qnapConfig *config.QNAPConfig, s *discord.MessageSession, fileNameStr string, downloadedRuns [][]string) error {
 	extension := path.Ext(fileNameStr)
 	fileName := strings.TrimSuffix(fileNameStr, extension)
 
@@ -413,11 +426,11 @@ func handleUpload(qnapConfig *config.QNAPConfig, fileNameStr string, downloadedR
 	}
 
 	if len(downloadedRuns) == 1 {
-		return uploadFile(qnapConfig, fmt.Sprintf("%s%s", fileName, extension), downloadedRuns[0], logger)
+		return uploadFile(qnapConfig, s, fmt.Sprintf("%s%s", fileName, extension), downloadedRuns[0])
 	} else {
 		for runNo, run := range downloadedRuns {
 			runFileName := fmt.Sprintf("%s_%v%s", fileName, runNo+1, extension)
-			if err := uploadFile(qnapConfig, runFileName, run, logger); err != nil {
+			if err := uploadFile(qnapConfig, s, runFileName, run); err != nil {
 				return err
 			}
 		}
@@ -425,8 +438,15 @@ func handleUpload(qnapConfig *config.QNAPConfig, fileNameStr string, downloadedR
 	}
 }
 
-func uploadFile(qnapConfig *config.QNAPConfig, fileName string, filePaths []string, logger *zap.SugaredLogger) error {
-	qnapAPI, err := qnap.New(qnapConfig.URL, logger)
+func uploadFile(qnapConfig *config.QNAPConfig, s *discord.MessageSession, fileName string, filePaths []string) error {
+	bar, err := s.SendBytesProgressBar(1*units.TiB, fmt.Sprintf("Uploading %s", fileName))
+	if err != nil {
+		msg := "Failed to initialize progress bar"
+		s.Logger.With(zap.Error(err)).Warn(msg)
+		s.SendError(fmt.Errorf(msg))
+	}
+
+	qnapAPI, err := qnap.New(qnapConfig.URL, s.Logger)
 	if err != nil {
 		return err
 	}
@@ -436,5 +456,5 @@ func uploadFile(qnapConfig *config.QNAPConfig, fileName string, filePaths []stri
 	}
 	defer qnapAPI.Logout()
 
-	return qnapAPI.UploadMany(qnapConfig.DownloadBasePath, fileName, filePaths)
+	return qnapAPI.UploadMany(qnapConfig.DownloadBasePath, fileName, filePaths, bar)
 }
