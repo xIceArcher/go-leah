@@ -9,6 +9,10 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	ErrMissingPermissions error = fmt.Errorf("missing permissions")
+)
+
 type Session struct {
 	*discordgo.Session
 
@@ -27,6 +31,20 @@ func (s *Session) WithMessage(m *discordgo.Message) *MessageSession {
 		Session: s,
 		Message: m,
 	}
+}
+
+func (s *Session) HasSendMessagePermissions(channelID string) (bool, error) {
+	permissions, err := s.State.UserChannelPermissions(s.State.User.ID, channelID)
+	if err != nil {
+		return false, err
+	}
+
+	if permissions&discordgo.PermissionSendMessages == 0 {
+		s.Logger.Info("No send message permissions")
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (s *Session) GetGuildPremiumTier(channelID string) discordgo.PremiumTier {
@@ -57,6 +75,11 @@ func (s *Session) GetMessageEmbeds(channelID string, messageID string) ([]*Updat
 func (s *Session) SendMessage(channelID string, format string, a ...any) {
 	msg := fmt.Sprintf(format, a...)
 
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
+		return
+	}
+
 	if _, err := s.ChannelMessageSend(channelID, msg); err != nil {
 		s.Logger.With(zap.Error(err)).Error("Failed to send message")
 	}
@@ -65,6 +88,11 @@ func (s *Session) SendMessage(channelID string, format string, a ...any) {
 func (s *Session) SendEmbed(channelID string, embed *discordgo.MessageEmbed) (*UpdatableMessageEmbed, error) {
 	if embed == nil {
 		return nil, fmt.Errorf("empty embed")
+	}
+
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
+		return nil, ErrMissingPermissions
 	}
 
 	m, err := s.ChannelMessageSendEmbed(channelID, embed)
@@ -84,6 +112,11 @@ func (s *Session) downloadImageAndSendEmbed(channelID string, embed *discordgo.M
 	if embed == nil || embed.Image == nil || embed.Image.URL == "" {
 		// Embed has no image
 		return s.SendEmbed(channelID, embed)
+	}
+
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
+		return nil, ErrMissingPermissions
 	}
 
 	file, _, err := utils.Download(embed.Image.URL, GetMessageMaxBytes(tier))
@@ -122,6 +155,11 @@ func (s *Session) SendEmbeds(channelID string, embeds []*discordgo.MessageEmbed)
 		embeds = embeds[:10]
 	}
 
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
+		return nil, ErrMissingPermissions
+	}
+
 	m, err := s.ChannelMessageSendEmbeds(channelID, embeds)
 	if err != nil {
 		s.Logger.With(zap.Error(err)).Error("Failed to send embeds")
@@ -136,6 +174,11 @@ func (s *Session) SendVideo(channelID string, videoURL string, fileName string) 
 }
 
 func (s *Session) sendVideo(channelID string, videoURL string, fileName string, tier discordgo.PremiumTier) {
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
+		return
+	}
+
 	file, _, err := utils.Download(videoURL, GetMessageMaxBytes(tier))
 	if err != nil {
 		// Video is too big, just send the URL
@@ -162,6 +205,11 @@ func (s *Session) SendVideos(channelID string, videoURLs []string, fileNamePrefi
 
 func (s *Session) sendVideos(channelID string, videoURLs []string, fileNamePrefix string, tier discordgo.PremiumTier) {
 	if len(videoURLs) == 0 {
+		return
+	}
+
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
 		return
 	}
 
@@ -219,6 +267,11 @@ func (s *Session) sendVideos(channelID string, videoURLs []string, fileNamePrefi
 }
 
 func (s *Session) SendBytesProgressBar(channelID string, totalBytes int64, description ...string) (*ProgressBar, error) {
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
+		return nil, ErrMissingPermissions
+	}
+
 	m, err := s.ChannelMessageSend(channelID, "Creating progress bar...")
 	if err != nil {
 		s.Logger.With(zap.Error(err)).Error("Failed to create progress bar")
@@ -229,6 +282,11 @@ func (s *Session) SendBytesProgressBar(channelID string, totalBytes int64, descr
 }
 
 func (s *Session) SendError(channelID string, errToSend error) {
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
+		return
+	}
+
 	if _, err := s.ChannelMessageSend(channelID, errToSend.Error()); err != nil {
 		s.Logger.With(zap.Error(err)).Error("Failed to send error message")
 	}
@@ -246,6 +304,12 @@ func (s *Session) SendInternalErrorWithMessage(channelID string, errToLog error,
 	msg := fmt.Sprintf(format, a...)
 
 	s.Logger.With(zap.Error(errToLog)).Error("Unexpected error")
+
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
+		return
+	}
+
 	if _, err := s.ChannelMessageSend(channelID, msg); err != nil {
 		s.Logger.With(zap.Error(err)).Error("Failed to send error message")
 	}
