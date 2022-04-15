@@ -80,5 +80,9 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 		}
 
 		s.SendEmbeds(tweet.GetEmbeds())
+
+		if tweet.HasVideo {
+			s.SendVideo(tweet.VideoURL, s.Message.ID)
+		}
 	}
 }
