@@ -43,6 +43,7 @@ func NewRegexHandler(cfg *config.Config, s *discord.Session) (MessageHandler, er
 		"instagramStory":    matcher.NewInstagramStoryMatcher,
 		"twitchLiveStream":  matcher.NewTwitchLiveStreamMatcher,
 		"twitterSpace":      matcher.NewTwitterSpaceMatcher,
+		"twitterPost":       matcher.NewTwitterPostMatcher,
 		"tiktokVideo":       matcher.NewTiktokVideoMatcher,
 	}
 

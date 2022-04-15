@@ -63,7 +63,7 @@ func (s *Session) GetGuildPremiumTier(channelID string) discordgo.PremiumTier {
 	return guild.PremiumTier
 }
 
-func (s *Session) GetMessageEmbeds(channelID string, messageID string) ([]*UpdatableMessageEmbed, error) {
+func (s *Session) GetMessageEmbeds(channelID string, messageID string) (UpdatableMessageEmbeds, error) {
 	m, err := s.ChannelMessage(channelID, messageID)
 	if err != nil {
 		return nil, err
@@ -325,6 +325,10 @@ func NewMessageSession(s *discordgo.Session, m *discordgo.Message, l *zap.Sugare
 		Session: NewSession(s, l),
 		Message: m,
 	}
+}
+
+func (s *MessageSession) GetMessageEmbeds() (UpdatableMessageEmbeds, error) {
+	return s.Session.GetMessageEmbeds(s.ChannelID, s.Message.ID)
 }
 
 func (s *MessageSession) SendMessage(format string, a ...any) {

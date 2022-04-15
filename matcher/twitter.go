@@ -2,6 +2,7 @@ package matcher
 
 import (
 	"context"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
@@ -40,4 +41,44 @@ func (m *TwitterSpaceMatcher) Handle(ctx context.Context, s *discord.MessageSess
 	}
 
 	s.SendEmbeds(embeds)
+}
+
+type TwitterPostMatcher struct {
+	GenericMatcher
+
+	api twitter.API
+}
+
+func NewTwitterPostMatcher(cfg *config.Config, s *discord.Session) (Matcher, error) {
+	return &TwitterPostMatcher{
+		api: twitter.NewBaseAPI(cfg.Twitter),
+	}, nil
+}
+
+func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSession, matches []string) {
+	time.Sleep(5 * time.Second)
+
+	existingEmbeds, err := s.GetMessageEmbeds()
+	if err != nil {
+		s.Logger.With(zap.Error(err)).Warn("Failed to get message embeds")
+		return
+	}
+
+	if len(existingEmbeds) > 0 {
+		return
+	}
+
+	for _, tweetID := range matches {
+		logger := s.Logger.With(
+			zap.String("tweetID", tweetID),
+		)
+
+		tweet, err := m.api.GetTweet(tweetID)
+		if err != nil {
+			logger.With(zap.Error(err)).Info("Failed to get tweet ID")
+			continue
+		}
+
+		s.SendEmbeds(tweet.GetEmbeds())
+	}
 }

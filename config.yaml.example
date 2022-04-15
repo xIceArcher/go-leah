@@ -75,6 +75,9 @@ discord:
     twitterSpace:
       regexes:
         - 'http[s]?://(?:w{3}\.)?twitter.com/i/spaces/([A-Za-z0-9_]*)'
+    twitterPost:
+      regexes:
+        - 'http[s]?://(?:w{3}\.)?twitter.com/[A-Za-z0-9_]+/status/([0-9]+)'
     tiktokVideo:
       regexes:
         - 'http[s]?://(?:w{3}\.)?tiktok.com/@[A-Za-z0-9_\.]*/video/([0-9]*)'
