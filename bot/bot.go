@@ -63,17 +63,31 @@ func (b *Bot) AddHandler(h handler.MessageHandler) {
 	}
 
 	b.messageHandlerCancelFunc = b.Session.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
-		logger := zap.S().With(
-			zap.String("guild", m.GuildID),
-			zap.String("channel", m.ChannelID),
-			zap.String("user", m.Author.Username),
-			zap.String("messageID", m.ID),
-		)
-
 		// Ignore messages by self
 		if m.Author.ID == s.State.User.ID {
 			return
 		}
+
+		logger := zap.S()
+
+		guild, err := s.State.Guild(m.GuildID)
+		if err != nil {
+			logger = logger.With("guildID", m.GuildID)
+		} else {
+			logger = logger.With("guild", guild.Name)
+		}
+
+		channel, err := s.State.Channel(m.ChannelID)
+		if err != nil {
+			logger = logger.With("channelID", m.ChannelID)
+		} else {
+			logger = logger.With("channel", channel.Name)
+		}
+
+		logger = logger.With(
+			zap.String("user", m.Author.Username),
+			zap.String("messageID", m.ID),
+		)
 
 		b.messageHandlers.HandleOne(b.ctx, discord.NewMessageSession(s, m.Message, logger))
 	})
