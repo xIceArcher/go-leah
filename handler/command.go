@@ -20,6 +20,8 @@ type CommandHandler struct {
 	AdminID       string
 
 	Cogs []*CogWithConfig
+
+	activeCommands map[string]struct{}
 }
 
 type CogWithConfig struct {
@@ -35,10 +37,14 @@ func NewCommandHandler(cfg *config.Config, s *discord.Session) (MessageHandler, 
 		"download":   cog.NewDownloadCog,
 	}
 
-	commandsSet := make(map[string]struct{})
+	activeCommands := make(map[string]struct{})
 
 	cogsWithConfig := make([]*CogWithConfig, 0, len(implementedCogs))
 	for cogName, cogCfg := range cfg.Discord.Cogs {
+		if len(cogCfg.Commands) == 0 {
+			continue
+		}
+
 		cogConstructor, ok := implementedCogs[cogName]
 		if !ok {
 			return nil, fmt.Errorf("cog %s not found", cogName)
@@ -53,25 +59,30 @@ func NewCommandHandler(cfg *config.Config, s *discord.Session) (MessageHandler, 
 		}
 		logger.Info("Initialized cog")
 
-		for _, command := range c.Commands() {
-			if _, ok := commandsSet[command]; ok {
+		implementedCommands := c.Commands()
+		for _, command := range cogCfg.Commands {
+			if !slices.Contains(implementedCommands, command) {
+				return nil, fmt.Errorf("command %s not found in cog %s", command, cogName)
+			}
+
+			if _, ok := activeCommands[command]; ok {
 				return nil, fmt.Errorf("duplicate command %s", command)
 			}
-			commandsSet[command] = struct{}{}
+			activeCommands[command] = struct{}{}
 		}
 
 		cogsWithConfig = append(cogsWithConfig, &CogWithConfig{
 			Cog:              c,
 			DiscordCogConfig: cogCfg,
 		})
-
 	}
 
 	return &CommandHandler{
 		CommandPrefix: cfg.Discord.Prefix,
 		AdminID:       cfg.Discord.AdminID,
 
-		Cogs: cogsWithConfig,
+		Cogs:           cogsWithConfig,
+		activeCommands: activeCommands,
 	}, nil
 }
 
@@ -92,6 +103,11 @@ func (h *CommandHandler) Handle(ctx context.Context, s *discord.MessageSession) 
 	}
 
 	msgCommand, msgArgs := msgSplit[0], msgSplit[1:]
+	if _, ok := h.activeCommands[msgCommand]; !ok {
+		s.Logger.Infof("Command %s not found", msgCommand)
+		return true
+	}
+
 	s.Logger = s.Logger.With(
 		zap.String("command", msgCommand),
 		zap.Strings("args", msgArgs),
