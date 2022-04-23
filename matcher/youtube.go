@@ -12,7 +12,9 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/cache"
 	"github.com/xIceArcher/go-leah/config"
+	"github.com/xIceArcher/go-leah/consts"
 	"github.com/xIceArcher/go-leah/discord"
+	"github.com/xIceArcher/go-leah/utils"
 	"github.com/xIceArcher/go-leah/youtube"
 	"go.uber.org/zap"
 )
@@ -181,21 +183,36 @@ func (m *YoutubeLiveStreamMatcher) watchVideoTask(cacheKey string, video *youtub
 			}
 			return
 		case <-time.After(time.Until(nextTickTime)):
-			var err error
+			startTime := video.LiveStreamingDetails.ActualStartTime
 
+			var err error
 			video, err = m.api.GetVideo(m.ctx, video.ID, []string{youtube.PartLiveStreamingDetails, youtube.PartContentDetails, youtube.PartSnippet})
 			if err != nil {
-				logger.With(zap.Error(err)).Error("Failed to get video")
-				return
+				// Assume the video ended and became unlisted
+				embed.Fields = []*discordgo.MessageEmbedField{
+					{
+						Name:   "Ended",
+						Value:  "~" + utils.FormatDiscordRelativeTime(time.Now()),
+						Inline: true,
+					},
+					{
+						Name:   "Duration",
+						Value:  "~" + utils.FormatDurationSimple(time.Now().Sub(startTime)),
+						Inline: true,
+					},
+				}
+
+				embed.Color = utils.ParseHexColor(consts.ColorNone)
+			} else {
+				embed.MessageEmbed = video.GetEmbed()
 			}
 
-			embed.MessageEmbed = video.GetEmbed()
 			if err := embed.Update(); err != nil {
 				logger.With(zap.Error(err)).Error("Failed to update embed")
 				return
 			}
 
-			if video.IsDone {
+			if video == nil || video.IsDone {
 				logger.Info("Video done")
 				return
 			}
