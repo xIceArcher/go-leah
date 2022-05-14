@@ -74,6 +74,9 @@ func (s *Session) GetMessageEmbeds(channelID string, messageID string) (Updatabl
 
 func (s *Session) SendMessage(channelID string, format string, a ...any) {
 	msg := fmt.Sprintf(format, a...)
+	if msg == "" {
+		return
+	}
 
 	hasPermissions, err := s.HasSendMessagePermissions(channelID)
 	if err != nil || !hasPermissions {
@@ -174,6 +177,10 @@ func (s *Session) SendVideo(channelID string, videoURL string, fileName string) 
 }
 
 func (s *Session) sendVideo(channelID string, videoURL string, fileName string, tier discordgo.PremiumTier) {
+	if videoURL == "" {
+		return
+	}
+
 	hasPermissions, err := s.HasSendMessagePermissions(channelID)
 	if err != nil || !hasPermissions {
 		return

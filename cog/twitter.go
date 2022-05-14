@@ -109,7 +109,7 @@ func (c *TwitterCog) Quoted(ctx context.Context, s *discord.MessageSession, args
 	}
 
 	s.SendEmbeds(tweet.QuotedStatus.GetEmbeds())
-	if tweet.HasVideo {
+	if tweet.QuotedStatus.HasVideo {
 		s.SendVideo(tweet.QuotedStatus.VideoURL, s.Message.ID)
 	}
 }
