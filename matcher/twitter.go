@@ -64,7 +64,8 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 		return
 	}
 
-	if len(existingEmbeds) > 0 {
+	// TODO: Find some way to match tweets to existing embeds
+	if len(matches) > 1 && len(existingEmbeds) > 0 {
 		return
 	}
 
@@ -79,9 +80,11 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 			continue
 		}
 
-		s.SendEmbeds(tweet.GetEmbeds())
+		if len(existingEmbeds) == 0 {
+			s.SendEmbeds(tweet.GetEmbeds())
+		}
 
-		if tweet.HasVideo {
+		if tweet.HasVideo && (len(existingEmbeds) == 0 || existingEmbeds[0].Video == nil) {
 			s.SendVideo(tweet.VideoURL, s.Message.ID)
 		}
 	}
