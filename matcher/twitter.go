@@ -69,23 +69,30 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 		return
 	}
 
-	for _, tweetID := range matches {
-		logger := s.Logger.With(
-			zap.String("tweetID", tweetID),
-		)
+	tweetID := matches[0]
 
-		tweet, err := m.api.GetTweet(tweetID)
-		if err != nil {
-			logger.With(zap.Error(err)).Info("Failed to get tweet ID")
-			continue
-		}
+	logger := s.Logger.With(
+		zap.String("tweetID", tweetID),
+	)
 
-		if len(existingEmbeds) == 0 {
-			s.SendEmbeds(tweet.GetEmbeds())
-		}
+	tweet, err := m.api.GetTweet(tweetID)
+	if err != nil {
+		logger.With(zap.Error(err)).Info("Failed to get tweet ID")
+		return
+	}
 
-		if tweet.HasVideo && (len(existingEmbeds) == 0 || existingEmbeds[0].Video == nil) {
-			s.SendVideo(tweet.VideoURL, s.Message.ID)
-		}
+	// Whole embed is missing or corrupted
+	if len(existingEmbeds) == 0 || existingEmbeds[0].Author == nil {
+		s.SendEmbeds(tweet.GetEmbeds())
+		s.SendVideo(tweet.VideoURL, s.Message.ID)
+		return
+	}
+
+	if tweet.HasPhotos && existingEmbeds[0].Image == nil {
+		s.SendEmbeds(tweet.GetEmbeds())
+	}
+
+	if tweet.HasVideo && existingEmbeds[0].Video == nil {
+		s.SendVideo(tweet.VideoURL, s.Message.ID)
 	}
 }
