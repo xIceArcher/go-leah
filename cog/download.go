@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -301,11 +302,15 @@ func handleMediaPlaylist(ctx context.Context, s *discord.MessageSession, client 
 
 					var iv []byte
 					if isEncrypted {
+						iv = make([]byte, 16)
+
 						if mediaList.Key.IV == "" {
-							iv = make([]byte, 16)
 							binary.BigEndian.PutUint16(iv, uint16(i+int(mediaList.SeqNo)))
 						} else {
-							iv = []byte(mediaList.Key.IV)
+							ivParsed := new(big.Int)
+							ivParsed.SetString(mediaList.Key.IV, 16)
+
+							ivParsed.FillBytes(iv)
 						}
 					}
 
