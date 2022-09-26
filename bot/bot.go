@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"runtime/debug"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
@@ -88,6 +89,12 @@ func (b *Bot) AddHandler(h handler.MessageHandler) {
 			zap.String("user", m.Author.Username),
 			zap.String("messageID", m.ID),
 		)
+
+		defer func() {
+			if r := recover(); r != nil {
+				logger.With("reason", r).With("stackTrace", string(debug.Stack())).Error("Command panicked")
+			}
+		}()
 
 		b.messageHandlers.HandleOne(b.ctx, discord.NewMessageSession(s, m.Message, logger))
 	})
