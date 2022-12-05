@@ -1,8 +1,10 @@
 package discord
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/utils"
@@ -172,11 +174,44 @@ func (s *Session) SendEmbeds(channelID string, embeds []*discordgo.MessageEmbed)
 	return NewUpdatableMessageEmbeds(s, m), nil
 }
 
-func (s *Session) SendVideo(channelID string, videoURL string, fileName string) {
-	s.sendVideo(channelID, videoURL, fileName, s.GetGuildPremiumTier(channelID))
+func (s *Session) SendVideo(channelID string, video io.ReadCloser, fileName string) {
+	s.sendVideo(channelID, video, fileName, s.GetGuildPremiumTier(channelID))
 }
 
-func (s *Session) sendVideo(channelID string, videoURL string, fileName string, tier discordgo.PremiumTier) {
+func (s *Session) sendVideo(channelID string, video io.ReadCloser, fileName string, tier discordgo.PremiumTier) {
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
+		return
+	}
+
+	buf := bytes.Buffer{}
+	if _, err := buf.ReadFrom(video); err != nil {
+		return
+	}
+	video.Close()
+
+	if buf.Len() > int(GetMessageMaxBytes(tier)) {
+		s.SendMessage(channelID, "Video is too large to embed!")
+	}
+
+	if _, err := s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+		Files: []*discordgo.File{
+			{
+				Name:        fmt.Sprintf("%s.mp4", fileName),
+				ContentType: "video/mp4",
+				Reader:      bytes.NewReader(buf.Bytes()),
+			},
+		},
+	}); err != nil {
+		s.Logger.With(zap.Error(err)).Error("Failed to send video")
+	}
+}
+
+func (s *Session) SendVideoURL(channelID string, videoURL string, fileName string) {
+	s.sendVideoURL(channelID, videoURL, fileName, s.GetGuildPremiumTier(channelID))
+}
+
+func (s *Session) sendVideoURL(channelID string, videoURL string, fileName string, tier discordgo.PremiumTier) {
 	if videoURL == "" {
 		return
 	}
@@ -206,11 +241,11 @@ func (s *Session) sendVideo(channelID string, videoURL string, fileName string, 
 	}
 }
 
-func (s *Session) SendVideos(channelID string, videoURLs []string, fileNamePrefix string) {
-	s.sendVideos(channelID, videoURLs, fileNamePrefix, s.GetGuildPremiumTier(channelID))
+func (s *Session) SendVideoURLs(channelID string, videoURLs []string, fileNamePrefix string) {
+	s.sendVideoURLs(channelID, videoURLs, fileNamePrefix, s.GetGuildPremiumTier(channelID))
 }
 
-func (s *Session) sendVideos(channelID string, videoURLs []string, fileNamePrefix string, tier discordgo.PremiumTier) {
+func (s *Session) sendVideoURLs(channelID string, videoURLs []string, fileNamePrefix string, tier discordgo.PremiumTier) {
 	if len(videoURLs) == 0 {
 		return
 	}
@@ -358,12 +393,16 @@ func (s *MessageSession) SendBytesProgressBar(totalBytes int64, description ...s
 	return s.Session.SendBytesProgressBar(s.ChannelID, totalBytes, description...)
 }
 
-func (s *MessageSession) SendVideo(videoURL string, fileName string) {
-	s.Session.sendVideo(s.ChannelID, videoURL, fileName, s.GetGuildPremiumTier())
+func (s *MessageSession) SendVideo(video io.ReadCloser, fileName string) {
+	s.Session.sendVideo(s.ChannelID, video, fileName, s.GetGuildPremiumTier())
 }
 
-func (s *MessageSession) SendVideos(videoURLs []string, fileNamePrefix string) {
-	s.Session.sendVideos(s.ChannelID, videoURLs, fileNamePrefix, s.GetGuildPremiumTier())
+func (s *MessageSession) SendVideoURL(videoURL string, fileName string) {
+	s.Session.sendVideoURL(s.ChannelID, videoURL, fileName, s.GetGuildPremiumTier())
+}
+
+func (s *MessageSession) SendVideoURLs(videoURLs []string, fileNamePrefix string) {
+	s.Session.sendVideoURLs(s.ChannelID, videoURLs, fileNamePrefix, s.GetGuildPremiumTier())
 }
 
 func (s *MessageSession) SendError(errToSend error) {

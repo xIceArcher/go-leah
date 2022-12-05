@@ -61,6 +61,6 @@ func (h *TiktokVideoMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 		}
 
 		s.SendEmbed(video.GetEmbed())
-		s.SendVideo(video.VideoURL, video.ID)
+		s.SendVideo(video.Video, video.ID)
 	}
 }

@@ -297,7 +297,7 @@ func (t *TweetStalkManager) handleTweetsTask(ctx context.Context, ch <-chan *twi
 					}
 
 					if tweet.HasVideo {
-						t.session.SendVideo(channelID, tweet.VideoURL, tweet.ID)
+						t.session.SendVideoURL(channelID, tweet.VideoURL, tweet.ID)
 					}
 
 					t.channelsToEmbeds[channelID][tweet.GetBaseID()] = updatableEmbeds

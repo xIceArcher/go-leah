@@ -40,7 +40,7 @@ func (m *InstagramPostMatcher) Handle(ctx context.Context, s *discord.MessageSes
 		}
 
 		s.SendEmbeds(post.GetEmbeds())
-		s.SendVideos(post.VideoURLs, shortcode)
+		s.SendVideoURLs(post.VideoURLs, shortcode)
 	}
 }
 
@@ -87,7 +87,7 @@ func (m *InstagramStoryMatcher) Handle(ctx context.Context, s *discord.MessageSe
 
 		s.DownloadImageAndSendEmbed(story.GetEmbed(), username)
 		if story.IsVideo() {
-			s.SendVideo(story.MediaURL, username)
+			s.SendVideoURL(story.MediaURL, username)
 		}
 	}
 }

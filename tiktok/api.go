@@ -70,10 +70,25 @@ func (API) GetVideo(postID string) (*Video, error) {
 		return nil, err
 	}
 
+	req, err := http.NewRequest(http.MethodGet, rawVideo.Video.DownloadAddr, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Referer", "https://www.tiktok.com/")
+	for _, cookie := range resp.Cookies() {
+		req.AddCookie(cookie)
+	}
+
+	vidResp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
 	video := &Video{
 		ID:          postID,
 		Description: rawVideo.Description,
-		VideoURL:    rawVideo.Video.DownloadAddr,
+		Video:       vidResp.Body,
 
 		Music: &Music{
 			ID:         rawVideo.Music.ID,

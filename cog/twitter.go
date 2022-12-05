@@ -58,7 +58,7 @@ func (c *TwitterCog) Embed(ctx context.Context, s *discord.MessageSession, args 
 
 	s.SendEmbeds(tweet.GetEmbeds())
 	if tweet.HasVideo {
-		s.SendVideo(tweet.VideoURL, s.Message.ID)
+		s.SendVideoURL(tweet.VideoURL, s.Message.ID)
 	}
 }
 
@@ -93,7 +93,7 @@ func (c *TwitterCog) Video(ctx context.Context, s *discord.MessageSession, args 
 		return
 	}
 
-	s.SendVideo(tweet.VideoURL, s.Message.ID)
+	s.SendVideoURL(tweet.VideoURL, s.Message.ID)
 }
 
 func (c *TwitterCog) Quoted(ctx context.Context, s *discord.MessageSession, args []string) {
@@ -110,7 +110,7 @@ func (c *TwitterCog) Quoted(ctx context.Context, s *discord.MessageSession, args
 
 	s.SendEmbeds(tweet.QuotedStatus.GetEmbeds())
 	if tweet.QuotedStatus.HasVideo {
-		s.SendVideo(tweet.QuotedStatus.VideoURL, s.Message.ID)
+		s.SendVideoURL(tweet.QuotedStatus.VideoURL, s.Message.ID)
 	}
 }
 

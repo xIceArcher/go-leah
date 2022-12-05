@@ -2,6 +2,7 @@ package tiktok
 
 import (
 	"fmt"
+	"io"
 	"net/url"
 	"strings"
 	"time"
@@ -62,7 +63,7 @@ type RawTextExtra struct {
 type Video struct {
 	ID          string
 	Description string
-	VideoURL    string
+	Video       io.ReadCloser
 
 	Music  *Music
 	Author *User

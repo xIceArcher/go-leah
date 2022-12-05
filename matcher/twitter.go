@@ -84,7 +84,7 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 	// Whole embed is missing or corrupted
 	if len(existingEmbeds) == 0 || existingEmbeds[0].Author == nil {
 		s.SendEmbeds(tweet.GetEmbeds())
-		s.SendVideo(tweet.VideoURL, s.Message.ID)
+		s.SendVideoURL(tweet.VideoURL, s.Message.ID)
 		return
 	}
 
@@ -93,6 +93,6 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 	}
 
 	if tweet.HasVideo && existingEmbeds[0].Video == nil {
-		s.SendVideo(tweet.VideoURL, s.Message.ID)
+		s.SendVideoURL(tweet.VideoURL, s.Message.ID)
 	}
 }
