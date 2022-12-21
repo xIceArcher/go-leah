@@ -496,6 +496,9 @@ func uploadAndConcatFiles(qnapConfig *config.QNAPConfig, s *discord.MessageSessi
 
 func (c *DownloadCog) Weibo(ctx context.Context, s *discord.MessageSession, args []string) {
 	links, archiveName := args[:len(args)-1], args[len(args)-1]
+	if !strings.HasSuffix(archiveName, ".zip") {
+		archiveName += ".zip"
+	}
 
 	postIDs := make([]string, 0, len(links))
 	for _, link := range links {
