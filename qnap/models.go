@@ -11,6 +11,14 @@ type LoginResponse struct {
 	SID string `json:"sid"`
 }
 
+type CreateDirResponse struct {
+	StatusMixin
+}
+
+type UploadResponse struct {
+	StatusMixin
+}
+
 type StartChunkedUploadResponse struct {
 	StatusMixin
 	UploadID string `json:"upload_id"`

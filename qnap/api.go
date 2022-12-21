@@ -19,8 +19,9 @@ import (
 type API interface {
 	Login(username string, password string) error
 	Logout() error
-	Upload(uploadDir string, fileName string, bytes []byte, bar ...progress.Bar) error
-	UploadMany(dir string, fileName string, filePaths []string, progressBar ...progress.Bar) error
+	CreateDir(rootDir string, dirName string) error
+	UploadMany(dir string, filePaths []string, progressBar ...progress.Bar) error
+	UploadAndConcat(dir string, fileName string, filePaths []string, progressBar ...progress.Bar) error
 	GetFileSize(path string, fileName string) (int64, error)
 }
 
@@ -90,41 +91,86 @@ type FileInfo struct {
 	NumBytes int64
 }
 
-func (a *QNAPAPI) Upload(uploadDir string, fileName string, bytes []byte, bar ...progress.Bar) error {
-	tempDir, err := os.MkdirTemp("", "")
+func (a *QNAPAPI) CreateDir(rootDir string, dirName string) error {
+	if a.sessionID == "" {
+		return ErrNotLoggedIn
+	}
+
+	createDirResp := &CreateDirResponse{}
+	_, err := a.utilRequest().
+		SetQueryParams(map[string]string{
+			"func": "createdir",
+		}).
+		SetFormData(map[string]string{
+			"dest_path":   rootDir,
+			"dest_folder": dirName,
+		}).
+		SetResult(createDirResp).
+		Post(a.utilRequestPath())
 	if err != nil {
 		return err
 	}
 
-	chunkSize := 5 * 1024 * 1024
-
-	filePaths := make([]string, 0)
-	for i := 0; i < len(bytes); i += chunkSize {
-		end := i + chunkSize
-		if end > len(bytes) {
-			end = len(bytes)
-		}
-
-		f, err := os.CreateTemp(tempDir, "")
-		if err != nil {
-			return err
-		}
-
-		if _, err := f.Write(bytes[i:end]); err != nil {
-			return err
-		}
-
-		filePaths = append(filePaths, f.Name())
+	if createDirResp.Status != StatusOK {
+		return ErrFailed
 	}
 
-	if err := a.UploadMany(uploadDir, fileName, filePaths, bar...); err != nil {
+	return nil
+}
+
+func (a *QNAPAPI) UploadMany(dirName string, filePaths []string, bar ...progress.Bar) error {
+	var progressBar progress.Bar
+	if len(bar) > 0 {
+		progressBar = bar[0]
+	}
+
+	if a.sessionID == "" {
+		return ErrNotLoggedIn
+	}
+
+	fileInfos, totalBytes, err := getFileSizes(filePaths)
+	if err != nil {
 		return err
 	}
 
-	return os.RemoveAll(tempDir)
+	if progressBar != nil {
+		progressBar.SetMax(totalBytes)
+	}
+
+	logger := a.logger.With(zap.String("dirName", dirName))
+	logger.Infof("Uploading file of size %v...", units.HumanSize(float64(totalBytes)))
+
+	for i, file := range fileInfos {
+		uploadResp := &UploadResponse{}
+
+		if _, err := a.utilRequest().
+			SetQueryParams(map[string]string{
+				"func":      "upload",
+				"type":      "standard",
+				"dest_path": dirName,
+				"overwrite": "0",
+				"progress":  path.Base(file.Path),
+			}).
+			SetFile("file", file.Path).
+			SetResult(uploadResp).
+			Post(a.utilRequestPath()); err != nil {
+			return err
+		}
+		if uploadResp.Status != StatusOK {
+			logger.Warnf("Upload returned error %v", uploadResp.Status)
+			continue
+		}
+
+		if progressBar != nil {
+			progressBar.Add(file.NumBytes)
+		}
+		logger.Infof("Uploaded file %v/%v", i+1, len(fileInfos))
+	}
+
+	return nil
 }
 
-func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []string, bar ...progress.Bar) error {
+func (a *QNAPAPI) UploadAndConcat(uploadDir string, fileName string, filePaths []string, bar ...progress.Bar) error {
 	var progressBar progress.Bar
 	if len(bar) > 0 {
 		progressBar = bar[0]
