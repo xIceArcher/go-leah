@@ -1,6 +1,8 @@
 package cog
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -13,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +30,7 @@ import (
 	"github.com/xIceArcher/go-leah/discord"
 	httpclient "github.com/xIceArcher/go-leah/http"
 	"github.com/xIceArcher/go-leah/qnap"
+	"github.com/xIceArcher/go-leah/weibo"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )
@@ -45,6 +49,7 @@ func NewDownloadCog(cfg *config.Config, s *discord.Session) (Cog, error) {
 	c.allCommands = map[string]CommandFunc{
 		"disk":       c.Disk,
 		"streamlink": c.Streamlink,
+		"weibo":      c.Weibo,
 	}
 
 	return c, nil
@@ -456,11 +461,11 @@ func handleUpload(qnapConfig *config.QNAPConfig, s *discord.MessageSession, file
 	}
 
 	if len(downloadedRuns) == 1 {
-		return uploadFile(qnapConfig, s, fmt.Sprintf("%s%s", fileName, extension), downloadedRuns[0])
+		return uploadAndConcatFiles(qnapConfig, s, fmt.Sprintf("%s%s", fileName, extension), downloadedRuns[0])
 	} else {
 		for runNo, run := range downloadedRuns {
 			runFileName := fmt.Sprintf("%s_%v%s", fileName, runNo+1, extension)
-			if err := uploadFile(qnapConfig, s, runFileName, run); err != nil {
+			if err := uploadAndConcatFiles(qnapConfig, s, runFileName, run); err != nil {
 				return err
 			}
 		}
@@ -468,7 +473,7 @@ func handleUpload(qnapConfig *config.QNAPConfig, s *discord.MessageSession, file
 	}
 }
 
-func uploadFile(qnapConfig *config.QNAPConfig, s *discord.MessageSession, fileName string, filePaths []string) error {
+func uploadAndConcatFiles(qnapConfig *config.QNAPConfig, s *discord.MessageSession, fileName string, filePaths []string) error {
 	bar, err := s.SendBytesProgressBar(1*units.TiB, fmt.Sprintf("Uploading %s", fileName))
 	if err != nil {
 		msg := "Failed to initialize progress bar"
@@ -487,4 +492,103 @@ func uploadFile(qnapConfig *config.QNAPConfig, s *discord.MessageSession, fileNa
 	defer qnapAPI.Logout()
 
 	return qnapAPI.UploadMany(qnapConfig.DownloadBasePath, fileName, filePaths, bar)
+}
+
+func (c *DownloadCog) Weibo(ctx context.Context, s *discord.MessageSession, args []string) {
+	links, archiveName := args[:len(args)-1], args[len(args)-1]
+
+	postIDs := make([]string, 0, len(links))
+	for _, link := range links {
+		regex := regexp.MustCompile(`http[s]?://(?:w{3}\.)?weibo.com/[0-9]+/([A-Za-z0-9]+)`)
+		matches := regex.FindStringSubmatch(link)
+		if len(matches) <= 1 {
+			continue
+		}
+		postIDs = append(postIDs, matches[1])
+	}
+
+	weiboAPI := weibo.NewAPI()
+
+	photos := make([]*weibo.PhotoVariant, 0)
+	for _, id := range postIDs {
+		post, err := weiboAPI.GetPost(id)
+		if err != nil {
+			s.SendError(err)
+			continue
+		}
+
+		for _, photo := range post.Photos {
+			photos = append(photos, photo.BestVariant())
+		}
+	}
+
+	bar, err := s.SendBytesProgressBar(0, fmt.Sprintf("Downloading %s", archiveName))
+	if err != nil {
+		s.SendError(err)
+		return
+	}
+
+	for _, photo := range photos {
+		photoSize, err := weiboAPI.GetPhotoVariantSize(photo)
+		if err != nil {
+			s.SendError(err)
+			continue
+		}
+
+		bar.AddMax(photoSize)
+	}
+
+	buf := &bytes.Buffer{}
+	w := zip.NewWriter(buf)
+
+	for i, photo := range photos {
+		f, err := w.Create(fmt.Sprintf("%v.jpg", i+1))
+		if err != nil {
+			s.SendError(err)
+			continue
+		}
+
+		photoBytes, err := weiboAPI.DownloadPhotoVariant(photo)
+		if err != nil {
+			s.SendError(err)
+			continue
+		}
+
+		if _, err := f.Write(photoBytes); err != nil {
+			s.SendError(err)
+			continue
+		}
+
+		bar.Add(int64(len(photoBytes)))
+	}
+
+	if err := w.Close(); err != nil {
+		s.SendError(err)
+		return
+	}
+
+	if c.qnapConfig.IsEnabled {
+		uploadFile(c.qnapConfig, s, archiveName, buf.Bytes())
+	}
+}
+
+func uploadFile(qnapConfig *config.QNAPConfig, s *discord.MessageSession, fileName string, bytes []byte) error {
+	bar, err := s.SendBytesProgressBar(1*units.TiB, fmt.Sprintf("Uploading %s", fileName))
+	if err != nil {
+		msg := "Failed to initialize progress bar"
+		s.Logger.With(zap.Error(err)).Warn(msg)
+		s.SendError(fmt.Errorf(msg))
+	}
+
+	qnapAPI, err := qnap.New(qnapConfig.URL, s.Logger)
+	if err != nil {
+		return err
+	}
+
+	if err := qnapAPI.Login(qnapConfig.Username, qnapConfig.Password); err != nil {
+		return err
+	}
+	defer qnapAPI.Logout()
+
+	return qnapAPI.Upload(qnapConfig.DownloadBasePath, fileName, bytes, bar)
 }

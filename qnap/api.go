@@ -19,6 +19,7 @@ import (
 type API interface {
 	Login(username string, password string) error
 	Logout() error
+	Upload(uploadDir string, fileName string, bytes []byte, bar ...progress.Bar) error
 	UploadMany(dir string, fileName string, filePaths []string, progressBar ...progress.Bar) error
 	GetFileSize(path string, fileName string) (int64, error)
 }
@@ -87,6 +88,40 @@ func (a *QNAPAPI) Logout() error {
 type FileInfo struct {
 	Path     string
 	NumBytes int64
+}
+
+func (a *QNAPAPI) Upload(uploadDir string, fileName string, bytes []byte, bar ...progress.Bar) error {
+	tempDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		return err
+	}
+
+	chunkSize := 5 * 1024 * 1024
+
+	filePaths := make([]string, 0)
+	for i := 0; i < len(bytes); i += chunkSize {
+		end := i + chunkSize
+		if end > len(bytes) {
+			end = len(bytes)
+		}
+
+		f, err := os.CreateTemp(tempDir, "")
+		if err != nil {
+			return err
+		}
+
+		if _, err := f.Write(bytes[i:end]); err != nil {
+			return err
+		}
+
+		filePaths = append(filePaths, f.Name())
+	}
+
+	if err := a.UploadMany(uploadDir, fileName, filePaths, bar...); err != nil {
+		return err
+	}
+
+	return os.RemoveAll(tempDir)
 }
 
 func (a *QNAPAPI) UploadMany(uploadDir string, fileName string, filePaths []string, bar ...progress.Bar) error {
