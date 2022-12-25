@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/utils"
@@ -114,6 +115,11 @@ func (s *Session) DownloadImageAndSendEmbed(channelID string, embed *discordgo.M
 }
 
 func (s *Session) downloadImageAndSendEmbed(channelID string, embed *discordgo.MessageEmbed, fileName string, tier discordgo.PremiumTier) (*UpdatableMessageEmbed, error) {
+	// Things break when the filename starts with an underscore
+	for strings.HasPrefix(fileName, "_") {
+		fileName = strings.TrimPrefix(fileName, "_")
+	}
+
 	if embed == nil || embed.Image == nil || embed.Image.URL == "" {
 		// Embed has no image
 		return s.SendEmbed(channelID, embed)
