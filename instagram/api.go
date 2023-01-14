@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -18,6 +18,7 @@ type API struct{}
 var (
 	instaPostURLFormat  string
 	instaStoryURLFormat string
+	instaUserURLFormat  string
 	client              *http.Client
 	apiSetupOnce        sync.Once
 )
@@ -26,6 +27,7 @@ func NewAPI(cfg *config.InstaConfig) (*API, error) {
 	apiSetupOnce.Do(func() {
 		instaPostURLFormat = cfg.PostURLFormat
 		instaStoryURLFormat = cfg.StoryURLFormat
+		instaUserURLFormat = cfg.UserURLFormat
 		client = &http.Client{
 			Timeout: 10 * time.Second,
 		}
@@ -45,13 +47,13 @@ func (API) GetPost(shortcode string) (*Post, error) {
 		return nil, fmt.Errorf("http error %v", resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	rawResp := RawPostResp{}
-	if err := json.Unmarshal(body, &rawResp); err != nil {
+	rawResp := &RawPostResp{}
+	if err := json.Unmarshal(body, rawResp); err != nil {
 		return nil, err
 	}
 
@@ -59,31 +61,39 @@ func (API) GetPost(shortcode string) (*Post, error) {
 		return nil, errors.New("failed to get post")
 	}
 
-	rawPost := rawResp.Items[0]
-
-	fullName := rawPost.User.FullName
-	if fullName == "" {
-		fullName = rawPost.User.Username
-	}
-
-	return &Post{
-		Shortcode: shortcode,
-		Owner: &User{
-			Username:      rawPost.User.Username,
-			Fullname:      fullName,
-			ProfilePicURL: rawPost.User.ProfilePicURL,
-		},
-
-		Text:      rawPost.Caption.Text,
-		Likes:     rawPost.LikeCount,
-		Timestamp: time.Unix(rawPost.TakenAtTimestamp, 0),
-
-		PhotoURLs: rawPost.extractPhotoURLs(),
-		VideoURLs: rawPost.extractVideoURLs(),
-	}, nil
+	return parsePost(&rawResp.Items[0]), nil
 }
 
-func (API) GetStory(username string, storyID string) (*Story, error) {
+func (a *API) GetStory(username string, storyID string) (*Story, error) {
+	resp, err := client.Get(fmt.Sprintf(instaStoryURLFormat, fmt.Sprintf("%s/%s", username, storyID)))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("http error %v", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	rawReelMedia := &RawReelMedia{}
+	if err := json.Unmarshal(body, rawReelMedia); err != nil {
+		return nil, err
+	}
+
+	user, err := getRawUser(username)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseStory(rawReelMedia, user), nil
+}
+
+func (API) GetLatestStory(username string) (*Story, error) {
 	resp, err := client.Get(fmt.Sprintf(instaStoryURLFormat, username))
 	if err != nil {
 		return nil, err
@@ -94,59 +104,99 @@ func (API) GetStory(username string, storyID string) (*Story, error) {
 		return nil, fmt.Errorf("http error %v", resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	rawResp := RawReel{}
-	if err := json.Unmarshal(body, &rawResp); err != nil {
+	rawReel := &RawReel{}
+	if err := json.Unmarshal(body, rawReel); err != nil {
 		return nil, err
 	}
 
-	if len(rawResp.ReelMedia) == 0 {
+	if len(rawReel.ReelMedia) == 0 {
 		return nil, errors.New("failed to get stories")
 	}
 
-	var rawReel *RawReelMedia
-	if storyID != "" {
-		for _, reel := range rawResp.ReelMedia {
-			if strings.HasPrefix(reel.ID, storyID) {
-				rawReel = reel
-				break
-			}
+	latestReelIdx := 0
+	for i, reel := range rawReel.ReelMedia {
+		if reel.TakenAtTimestamp > rawReel.ReelMedia[latestReelIdx].TakenAtTimestamp {
+			latestReelIdx = i
 		}
-
-		if rawReel == nil {
-			return nil, errors.New("failed to get story")
-		}
-	} else {
-		latestReelIdx := 0
-		for i, reel := range rawResp.ReelMedia {
-			if reel.TakenAtTimestamp > rawResp.ReelMedia[latestReelIdx].TakenAtTimestamp {
-				latestReelIdx = i
-			}
-		}
-		rawReel = rawResp.ReelMedia[latestReelIdx]
 	}
 
-	fullName := rawResp.User.FullName
-	if fullName == "" {
-		fullName = rawResp.User.Username
+	return parseStory(rawReel.ReelMedia[latestReelIdx], &rawReel.User), nil
+}
+
+func (API) GetUser(username string) (*User, error) {
+	rawUser, err := getRawUser(username)
+	if err != nil {
+		return nil, err
 	}
 
+	return parseUser(rawUser), nil
+}
+
+func getRawUser(username string) (*RawUser, error) {
+	resp, err := client.Get(fmt.Sprintf(instaUserURLFormat, username))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("http error %v", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	rawUser := &RawUserResp{}
+	if err := json.Unmarshal(body, &rawUser); err != nil {
+		return nil, err
+	}
+
+	return rawUser.User, nil
+}
+
+func parsePost(rawPost *RawPost) *Post {
+	return &Post{
+		Shortcode: rawPost.Shortcode,
+		Owner:     parseUser(&rawPost.User),
+
+		Text:      rawPost.Caption.Text,
+		Likes:     rawPost.LikeCount,
+		Timestamp: time.Unix(rawPost.TakenAtTimestamp, 0),
+
+		PhotoURLs: rawPost.extractPhotoURLs(),
+		VideoURLs: rawPost.extractVideoURLs(),
+	}
+}
+
+func parseStory(rawReelMedia *RawReelMedia, rawUser *RawUser) *Story {
 	return &Story{
-		ID: strings.Split(rawReel.ID, "_")[0],
-		Owner: &User{
-			Username:      rawResp.User.Username,
-			Fullname:      fullName,
-			ProfilePicURL: rawResp.User.ProfilePicURL,
-		},
+		ID:    strings.Split(rawReelMedia.ID, "_")[0],
+		Owner: parseUser(rawUser),
 
-		Timestamp: time.Unix(rawReel.TakenAtTimestamp, 0),
-		MediaURL:  rawReel.extractMediaURL(),
-		MediaType: rawReel.MediaType,
-	}, nil
+		Timestamp: time.Unix(rawReelMedia.TakenAtTimestamp, 0),
+		MediaURL:  rawReelMedia.extractMediaURL(),
+		MediaType: rawReelMedia.MediaType,
+	}
+}
+
+func parseUser(rawUser *RawUser) *User {
+	fullName := rawUser.FullName
+	if fullName == "" {
+		fullName = rawUser.Username
+	}
+
+	return &User{
+		Username:      rawUser.Username,
+		Fullname:      fullName,
+		ProfilePicURL: rawUser.ProfilePicURL,
+	}
 }
 
 func (API) GetHashtagURL(s string) string {

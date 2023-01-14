@@ -39,6 +39,7 @@ type GoogleConfig struct {
 type InstaConfig struct {
 	PostURLFormat  string `yaml:"postUrlFormat"`
 	StoryURLFormat string `yaml:"storyUrlFormat"`
+	UserURLFormat  string `yaml:"userUrlFormat"`
 }
 
 type TwitchConfig struct {

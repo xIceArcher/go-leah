@@ -41,6 +41,10 @@ type RawReel struct {
 	ReelMedia []*RawReelMedia `json:"items"`
 }
 
+type RawUserResp struct {
+	User *RawUser `json:"user"`
+}
+
 type RawUser struct {
 	Username      string `json:"username"`
 	FullName      string `json:"full_name"`

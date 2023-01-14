@@ -67,8 +67,11 @@ func (m *InstagramStoryMatcher) Handle(ctx context.Context, s *discord.MessageSe
 			zap.String("match", match),
 		)
 
-		username := match
-		storyID := ""
+		var (
+			username string
+			story    *instagram.Story
+			err      error
+		)
 		if strings.Contains(match, "/") {
 			parts := strings.Split(match, "/")
 			if len(parts) != 2 {
@@ -76,10 +79,15 @@ func (m *InstagramStoryMatcher) Handle(ctx context.Context, s *discord.MessageSe
 				continue
 			}
 
-			username, storyID = parts[0], parts[1]
+			username = parts[0]
+			storyID := parts[1]
+
+			story, err = m.api.GetStory(username, storyID)
+		} else {
+			username = match
+			story, err = m.api.GetLatestStory(username)
 		}
 
-		story, err := m.api.GetStory(username, storyID)
 		if err != nil {
 			logger.With(zap.Error(err)).Error("Get story")
 			continue
