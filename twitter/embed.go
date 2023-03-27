@@ -36,8 +36,8 @@ func (t *Tweet) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 		embeds = append(embeds, t.GetPhotoEmbeds()[1:]...)
 	}
 
-	embeds[len(embeds)-1].Footer = twitterEmbedFooter
-	embeds[len(embeds)-1].Timestamp = t.Timestamp.Format(time.RFC3339)
+	embeds[0].Footer = twitterEmbedFooter
+	embeds[0].Timestamp = t.Timestamp.Format(time.RFC3339)
 
 	return embeds
 }
@@ -100,6 +100,7 @@ func (t *Tweet) GetPhotoEmbeds() []*discordgo.MessageEmbed {
 	embeds := make([]*discordgo.MessageEmbed, 0, len(t.PhotoURLs))
 	for _, url := range t.PhotoURLs {
 		embeds = append(embeds, &discordgo.MessageEmbed{
+			URL: t.URL(),
 			Image: &discordgo.MessageEmbedImage{
 				URL: url,
 			},
@@ -202,3 +203,4 @@ func (s *Space) GetEmbed() *discordgo.MessageEmbed {
 		Footer:    twitterEmbedFooter,
 	}
 }
+

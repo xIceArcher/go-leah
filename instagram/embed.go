@@ -10,6 +10,10 @@ import (
 	"github.com/xIceArcher/go-leah/utils"
 )
 
+const (
+	MAX_EMBEDS_PER_POST = 4
+)
+
 func (p *Post) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 	textWithEntities := &utils.TextWithEntities{Text: p.Text}
 	textWithEntities.AddByRegex(MentionRegex, func(s string) string {
@@ -35,15 +39,10 @@ func (p *Post) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 
 	for _, text := range segmentedText[1:] {
 		embeds = append(embeds, &discordgo.MessageEmbed{
+			URL:         p.URL(),
 			Description: text,
 			Color:       utils.ParseHexColor(consts.ColorInsta),
 		})
-	}
-
-	if len(p.PhotoURLs) > 0 {
-		embeds[len(embeds)-1].Image = &discordgo.MessageEmbedImage{
-			URL: p.PhotoURLs[0],
-		}
 	}
 
 	embeds[len(embeds)-1].Fields = []*discordgo.MessageEmbedField{
@@ -54,9 +53,24 @@ func (p *Post) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 		},
 	}
 
-	if len(p.PhotoURLs) > 0 {
-		for _, photoURL := range p.PhotoURLs[1:] {
+	footerEmbedIdx := len(embeds) - 1
+	for i, photoURL := range p.PhotoURLs {
+		if i == 0 {
+			embeds[len(embeds)-1].Image = &discordgo.MessageEmbedImage{
+				URL: p.PhotoURLs[0],
+			}
+		} else {
+			embedURL := p.URL()
+			if i >= MAX_EMBEDS_PER_POST {
+				embedURL += fmt.Sprintf("?s=%v", i/MAX_EMBEDS_PER_POST)
+			}
+
+			if i%MAX_EMBEDS_PER_POST == 0 {
+				footerEmbedIdx += MAX_EMBEDS_PER_POST
+			}
+
 			embeds = append(embeds, &discordgo.MessageEmbed{
+				URL: embedURL,
 				Image: &discordgo.MessageEmbedImage{
 					URL: photoURL,
 				},
@@ -65,11 +79,11 @@ func (p *Post) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 		}
 	}
 
-	embeds[len(embeds)-1].Footer = &discordgo.MessageEmbedFooter{
+	embeds[footerEmbedIdx].Footer = &discordgo.MessageEmbedFooter{
 		Text:    "Instagram",
 		IconURL: "https://instagram-brand.com/wp-content/uploads/2016/11/Instagram_AppIcon_Aug2017.png?w=300",
 	}
-	embeds[len(embeds)-1].Timestamp = p.Timestamp.Format(time.RFC3339)
+	embeds[footerEmbedIdx].Timestamp = p.Timestamp.Format(time.RFC3339)
 
 	return embeds
 }
@@ -99,3 +113,4 @@ func (s *Story) GetEmbed() *discordgo.MessageEmbed {
 
 	return embed
 }
+
