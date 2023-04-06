@@ -309,7 +309,7 @@ func (t *TweetStalkManager) handleTweetsTask(ctx context.Context, ch <-chan *twi
 }
 
 func (t *TweetStalkManager) handleRetweet(embeds discord.UpdatableMessageEmbeds, tweet *twitter.Tweet, logger *zap.SugaredLogger) {
-	originalTimeStr := embeds[len(embeds)-1].Timestamp
+	originalTimeStr := embeds[0].Timestamp
 	originalTime, ok := utils.ParseISOTime(originalTimeStr)
 	if !ok {
 		logger.Errorf("Failed to parse timestamp %s", originalTimeStr)
