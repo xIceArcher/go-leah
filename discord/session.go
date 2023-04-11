@@ -198,6 +198,7 @@ func (s *Session) sendVideo(channelID string, video io.ReadCloser, fileName stri
 
 	if buf.Len() > int(GetMessageMaxBytes(tier)) {
 		s.SendMessage(channelID, "Video is too large to embed!")
+		return
 	}
 
 	if _, err := s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
