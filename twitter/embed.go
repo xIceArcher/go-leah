@@ -143,6 +143,10 @@ func (t *Tweet) GetTextWithEmbeds() string {
 			return ""
 		}
 
+		if finalURL == (&Tweet{ID: t.ID, User: &User{ScreenName: "i/web"}}).URL() {
+			return ""
+		}
+
 		return finalURL
 	}, t.URLs...)
 
@@ -203,4 +207,3 @@ func (s *Space) GetEmbed() *discordgo.MessageEmbed {
 		Footer:    twitterEmbedFooter,
 	}
 }
-
