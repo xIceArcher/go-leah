@@ -3,6 +3,7 @@ package qnap
 import (
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -23,6 +24,7 @@ type API interface {
 	UploadMany(dir string, filePaths []string, progressBar ...progress.Bar) error
 	UploadAndConcat(dir string, fileName string, filePaths []string, progressBar ...progress.Bar) error
 	GetFileSize(path string, fileName string) (int64, error)
+	Exists(path string, fileName string) (bool, error)
 }
 
 type QNAPAPI struct {
@@ -294,7 +296,7 @@ func (a *QNAPAPI) GetFileSize(path string, fileName string) (int64, error) {
 		return 0, err
 	}
 
-	if len(statResp.Datas) == 0 || statResp.Datas[0].FileName != fileName {
+	if len(statResp.Datas) == 0 || !statResp.Datas[0].IsExist() || statResp.Datas[0].FileName != fileName {
 		return 0, ErrNotFound
 	}
 
@@ -304,6 +306,17 @@ func (a *QNAPAPI) GetFileSize(path string, fileName string) (int64, error) {
 	}
 
 	return fileSize, nil
+}
+
+func (a *QNAPAPI) Exists(path string, fileName string) (bool, error) {
+	_, err := a.GetFileSize(path, fileName)
+	if err == nil {
+		return true, nil
+	} else if errors.Is(err, ErrNotFound) {
+		return false, nil
+	}
+
+	return false, err
 }
 
 func (a *QNAPAPI) utilRequest() *resty.Request {

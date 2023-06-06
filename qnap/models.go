@@ -30,8 +30,15 @@ type ChunkedUploadResponse struct {
 }
 
 type StatResponse struct {
-	Datas []struct {
-		FileName string `json:"filename"`
-		FileSize string `json:"filesize"`
-	} `json:"datas"`
+	Datas []StatData `json:"datas"`
+}
+
+type StatData struct {
+	FileName string `json:"filename"`
+	FileSize string `json:"filesize"`
+	Exist    int    `json:"exist"`
+}
+
+func (d *StatData) IsExist() bool {
+	return d.Exist != 0
 }

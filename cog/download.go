@@ -126,6 +126,19 @@ func (c *DownloadCog) Streamlink(ctx context.Context, s *discord.MessageSession,
 			return
 		}
 
+		if c.qnapConfig.IsEnabled {
+			exists, err := checkFileExists(ctx, s, c.qnapConfig, commandArgs.Args.FileName)
+			if err != nil {
+				s.SendError(err)
+				return
+			}
+
+			if exists {
+				s.SendMessage("File %s already exists!", commandArgs.Args.FileName)
+				return
+			}
+		}
+
 		s.SendMessage("Starting to download %s", commandArgs.Args.FileName)
 
 		downloadedRuns, err := handleMediaPlaylist(ctx, s, client, commandArgs.Args.M3U8URLStr, playlist.Key, dir)
@@ -161,6 +174,27 @@ type Segment struct {
 	FileName string
 	URL      *url.URL
 	IV       []byte
+}
+
+func checkFileExists(ctx context.Context, s *discord.MessageSession, qnapConfig *config.QNAPConfig, fileNameStr string) (bool, error) {
+	extension := path.Ext(fileNameStr)
+	fileName := strings.TrimSuffix(fileNameStr, extension)
+
+	if extension == "" {
+		extension = ".ts"
+	}
+
+	qnapAPI, err := qnap.New(qnapConfig.URL, s.Logger)
+	if err != nil {
+		return false, err
+	}
+
+	if err := qnapAPI.Login(qnapConfig.Username, qnapConfig.Password); err != nil {
+		return false, err
+	}
+	defer qnapAPI.Logout()
+
+	return qnapAPI.Exists(qnapConfig.DownloadBasePath, fmt.Sprintf("%s%s", fileName, extension))
 }
 
 func handleMediaPlaylist(ctx context.Context, s *discord.MessageSession, client *retryablehttp.Client, m3u8UrlStr string, key *m3u8.Key, dir string) (downloadRuns [][]string, err error) {
