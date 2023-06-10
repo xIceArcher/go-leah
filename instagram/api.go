@@ -29,7 +29,7 @@ func NewAPI(cfg *config.InstaConfig) (*API, error) {
 		instaStoryURLFormat = cfg.StoryURLFormat
 		instaUserURLFormat = cfg.UserURLFormat
 		client = &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 30 * time.Second,
 		}
 	})
 
