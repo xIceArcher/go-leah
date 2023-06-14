@@ -45,14 +45,6 @@ func (p *Post) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 		})
 	}
 
-	embeds[len(embeds)-1].Fields = []*discordgo.MessageEmbedField{
-		{
-			Name:   "Likes",
-			Value:  fmt.Sprintf("%v", p.Likes),
-			Inline: true,
-		},
-	}
-
 	footerEmbedIdx := len(embeds) - 1
 	for i, photoURL := range p.PhotoURLs {
 		if i == 0 {
@@ -113,4 +105,3 @@ func (s *Story) GetEmbed() *discordgo.MessageEmbed {
 
 	return embed
 }
-

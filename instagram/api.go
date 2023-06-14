@@ -167,7 +167,6 @@ func parsePost(rawPost *RawPost) *Post {
 		Owner:     parseUser(&rawPost.User),
 
 		Text:      rawPost.Caption.Text,
-		Likes:     rawPost.LikeCount,
 		Timestamp: time.Unix(rawPost.TakenAtTimestamp, 0),
 
 		PhotoURLs: rawPost.extractPhotoURLs(),

@@ -30,7 +30,6 @@ type RawPost struct {
 	ImageVersions *RawImageVersions `json:"image_versions2"`
 	VideoVersions []*RawVideo       `json:"video_versions"`
 
-	LikeCount        int   `json:"like_count"`
 	TakenAtTimestamp int64 `json:"taken_at"`
 }
 
@@ -185,7 +184,6 @@ type Post struct {
 	Owner     *User
 
 	Text      string
-	Likes     int
 	Timestamp time.Time
 
 	PhotoURLs []string
