@@ -73,7 +73,7 @@ func (p *Post) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 
 	embeds[footerEmbedIdx].Footer = &discordgo.MessageEmbedFooter{
 		Text:    "Instagram",
-		IconURL: "https://instagram-brand.com/wp-content/uploads/2016/11/Instagram_AppIcon_Aug2017.png?w=300",
+		IconURL: "https://www.instagram.com/static/images/ico/favicon-192.png/68d99ba29cc8.png",
 	}
 	embeds[footerEmbedIdx].Timestamp = p.Timestamp.Format(time.RFC3339)
 
