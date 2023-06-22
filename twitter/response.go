@@ -1,66 +1,104 @@
 package twitter
 
-import "time"
+import (
+	"time"
+)
 
-type getSpaceResponse struct {
-	Data *struct {
-		ID    string `json:"id"`
-		State string `json:"state"`
-
-		StartedAt time.Time `json:"started_at"`
-		EndedAt   time.Time `json:"ended_at"`
-
-		Title            string `json:"title"`
-		CreatorID        string `json:"creator_id"`
-		ParticipantCount int    `json:"participant_count"`
-	} `json:"data"`
-	Includes *struct {
-		Users []struct {
-			ProfileImageURL string `json:"profile_image_url"`
-			ID              string `json:"id"`
-			Username        string `json:"username"`
-			Name            string `json:"name"`
-		} `json:"users"`
-	} `json:"includes"`
-	Errors []*struct {
-		Value        string `json:"value"`
-		Detail       string `json:"detail"`
-		Title        string `json:"title"`
-		ResourceType string `json:"resource_type"`
-		Parameter    string `json:"parameter"`
-		ResourceID   string `json:"resource_id"`
-		Type         string `json:"type"`
-	} `json:"errors"`
+type getTweetResponse struct {
+	Code    int      `json:"code"`
+	Message string   `json:"message"`
+	Tweet   rawTweet `json:"tweet"`
 }
 
-func (r *getSpaceResponse) toDTO() *Space {
-	if len(r.Errors) > 0 || r.Data == nil {
-		return &Space{}
+type rawTweet struct {
+	ID               string    `json:"id"`
+	URL              string    `json:"url"`
+	Text             string    `json:"text"`
+	CreatedAt        string    `json:"created_at"`
+	CreatedTimestamp int       `json:"created_timestamp"`
+	Author           rawAuthor `json:"author"`
+	Replies          int       `json:"replies"`
+	Retweets         int       `json:"retweets"`
+	Likes            int       `json:"likes"`
+	Views            int       `json:"views"`
+	Color            string    `json:"color"`
+	TwitterCard      string    `json:"twitter_card"`
+	Lang             string    `json:"lang"`
+	Source           string    `json:"source"`
+	ReplyingTo       *string   `json:"replying_to"`
+	ReplyingToStatus *string   `json:"replying_to_status"`
+	Quote            *rawTweet `json:"quote"`
+	Media            *rawMedia `json:"media"`
+}
+
+type rawAuthor struct {
+	Name        string `json:"name"`
+	ScreenName  string `json:"screen_name"`
+	AvatarURL   string `json:"avatar_url"`
+	AvatarColor string `json:"avatar_color"`
+	BannerURL   string `json:"banner_url"`
+}
+
+type rawMedia struct {
+	Photos []*rawPhoto `json:"photos"`
+	Videos []*rawVideo `json:"videos"`
+}
+
+type rawPhoto struct {
+	Type   string `json:"type"`
+	URL    string `json:"url"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+}
+
+type rawVideo struct {
+	URL          string  `json:"url"`
+	ThumbnailURL string  `json:"thumbnail_url"`
+	Width        int     `json:"width"`
+	Height       int     `json:"height"`
+	Duration     float64 `json:"duration"`
+	Format       string  `json:"format"`
+	Type         string  `json:"type"`
+}
+
+func (t *rawTweet) ToDTO() *Tweet {
+	if t == nil {
+		return nil
 	}
 
-	space := &Space{
-		ID:    r.Data.ID,
-		Title: r.Data.Title,
-		State: SpaceState(r.Data.State),
-
-		ParticipantCount: r.Data.ParticipantCount,
-
-		StartTime: r.Data.StartedAt,
-		EndTime:   r.Data.EndedAt,
-	}
-
-	if r.Includes != nil {
-		for _, includedUser := range r.Includes.Users {
-			if includedUser.ID == r.Data.CreatorID {
-				space.Creator = &User{
-					ID:              includedUser.ID,
-					Name:            includedUser.Name,
-					ScreenName:      includedUser.Username,
-					ProfileImageURL: includedUser.ProfileImageURL,
-				}
-			}
+	photoURLs := make([]string, 0)
+	if t.Media != nil {
+		for _, photo := range t.Media.Photos {
+			photoURLs = append(photoURLs, photo.URL)
 		}
 	}
 
-	return space
+	videoURL := ""
+	if t.Media != nil && len(t.Media.Videos) > 0 {
+		videoURL = t.Media.Videos[0].URL
+	}
+
+	return &Tweet{
+		ID: t.ID,
+		User: &User{
+			ID:              "",
+			Name:            t.Author.Name,
+			ScreenName:      t.Author.ScreenName,
+			ProfileImageURL: t.Author.AvatarURL,
+		},
+		Text:      t.Text,
+		Timestamp: time.Unix(int64(t.CreatedTimestamp), 0),
+
+		HasPhotos: t.Media != nil && len(t.Media.Photos) > 0,
+		PhotoURLs: photoURLs,
+
+		HasVideo: t.Media != nil && len(t.Media.Videos) > 0,
+		VideoURL: videoURL,
+
+		IsRetweet:       false,
+		RetweetedStatus: nil,
+
+		IsQuoted:     t.Quote != nil,
+		QuotedStatus: t.Quote.ToDTO(),
+	}
 }

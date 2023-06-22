@@ -31,10 +31,9 @@ type CogWithConfig struct {
 
 func NewCommandHandler(cfg *config.Config, s *discord.Session) (MessageHandler, error) {
 	implementedCogs := map[string]cog.Constructor{
-		"admin":      cog.NewAdminCog,
-		"twitter":    cog.NewTwitterCog,
-		"tweetstalk": cog.NewTweetStalkCog,
-		"download":   cog.NewDownloadCog,
+		"admin":    cog.NewAdminCog,
+		"twitter":  cog.NewTwitterCog,
+		"download": cog.NewDownloadCog,
 	}
 
 	activeCommands := make(map[string]struct{})

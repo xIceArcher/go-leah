@@ -4,8 +4,6 @@ go 1.18
 
 require (
 	github.com/bwmarrin/discordgo v0.24.0
-	github.com/dghubble/go-twitter v0.0.0-20211002212826-ad02880e616b
-	github.com/dghubble/oauth1 v0.7.0
 	github.com/docker/go-units v0.4.0
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/go-resty/resty/v2 v2.6.0
@@ -23,7 +21,6 @@ require (
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.19.1
 	golang.org/x/exp v0.0.0-20220317015231-48e79f11773a
-	golang.org/x/oauth2 v0.0.0-20211028175245-ba495a64dcb5
 	google.golang.org/api v0.60.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
@@ -31,15 +28,12 @@ require (
 require (
 	cloud.google.com/go v0.97.0 // indirect
 	github.com/BurntSushi/toml v0.4.1 // indirect
-	github.com/cenkalti/backoff/v4 v4.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dghubble/sling v1.4.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
@@ -52,6 +46,7 @@ require (
 	go.uber.org/multierr v1.7.0 // indirect
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
+	golang.org/x/oauth2 v0.0.0-20211028175245-ba495a64dcb5 // indirect
 	golang.org/x/sys v0.0.0-20220412071739-889880a91fd5 // indirect
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171 // indirect
 	golang.org/x/text v0.3.7 // indirect

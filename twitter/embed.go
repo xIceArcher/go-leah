@@ -2,7 +2,6 @@ package twitter
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -115,48 +114,7 @@ func (t *Tweet) GetTextWithEmbeds() string {
 	if t.IsRetweet {
 		return t.RetweetedStatus.GetTextWithEmbeds()
 	}
-
-	textWithEntities := utils.TextWithEntities{Text: t.Text}
-
-	textWithEntities.AddEntities(func(u *utils.Entity) string {
-		return discord.GetNamedLink(u.Match, fmt.Sprintf("https://twitter.com/hashtag/%s", u.Match[1:]))
-	}, t.Hashtags...)
-
-	textWithEntities.AddEntities(func(u *utils.Entity) string {
-		if t.IsReply && strings.EqualFold(u.Match[1:], t.ReplyUser.ScreenName) {
-			return ""
-		}
-		return discord.GetNamedLink(u.Match, (&User{Name: u.Match}).URL())
-	}, t.UserMentions...)
-
-	textWithEntities.AddEntities(func(u *utils.Entity) string {
-		return ""
-	}, t.MediaLinks...)
-
-	textWithEntities.AddEntities(func(u *utils.Entity) string {
-		finalURL, err := utils.ExpandURL(u.Replacement, expandIgnoreRegexes...)
-		if err != nil {
-			return u.Replacement
-		}
-
-		if t.IsQuoted && strings.EqualFold(finalURL, t.QuotedStatus.URL()) {
-			return ""
-		}
-
-		if finalURL == (&Tweet{ID: t.ID, User: &User{ScreenName: "i/web"}}).URL() {
-			return ""
-		}
-
-		return finalURL
-	}, t.URLs...)
-
-	textWithEntities.AddByRegex(regexp.MustCompile(`&amp;`), func(s string) string { return "&" })
-	textWithEntities.AddByRegex(regexp.MustCompile(`&lt;`), func(s string) string { return "<" })
-	textWithEntities.AddByRegex(regexp.MustCompile(`&gt;`), func(s string) string { return ">" })
-
-	replacedText := textWithEntities.GetReplacedText(4096, -1)
-
-	return strings.TrimSpace(replacedText[0])
+	return strings.TrimSpace(t.Text)
 }
 
 func (u *User) GetEmbed() *discordgo.MessageEmbedAuthor {
