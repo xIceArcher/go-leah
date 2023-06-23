@@ -2,6 +2,7 @@ package matcher
 
 import (
 	"context"
+	"time"
 
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/discord"
@@ -22,6 +23,8 @@ func NewTwitterPostMatcher(cfg *config.Config, s *discord.Session) (Matcher, err
 }
 
 func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSession, matches []string) {
+	time.Sleep(5 * time.Second)
+	
 	existingEmbeds, err := s.GetMessageEmbeds()
 	if err != nil {
 		s.Logger.With(zap.Error(err)).Warn("Failed to get message embeds")
