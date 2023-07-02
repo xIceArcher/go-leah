@@ -36,8 +36,9 @@ func (t *Tweet) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 	}
 
 	embeds[0].Footer = twitterEmbedFooter
-	embeds[0].Timestamp = t.Timestamp.Format(time.RFC3339)
-
+	if t.Timestamp.Unix() != 0 {
+		embeds[0].Timestamp = t.Timestamp.Format(time.RFC3339)
+	}
 	return embeds
 }
 
