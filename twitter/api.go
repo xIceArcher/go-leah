@@ -27,7 +27,7 @@ const (
 	CacheKeyTwitterAPITweetFormat = "go-leah/twitterAPI/tweet/%s"
 )
 
-var URLRegex *regexp.Regexp = regexp.MustCompile(`(?:http[s]?://)?twitter\.com/[^/]*/status/([0-9]*)(?:\?[^ \r\n]*)?`)
+var URLRegex *regexp.Regexp = regexp.MustCompile(`(?:http[s]?://)?(?:(?:twitter)|(?:x))\.com/[^/]*/status/([0-9]*)(?:\?[^ \r\n]*)?`)
 var ErrNotFound = errors.New("not found")
 var ErrInternalServerError = errors.New("internal server error")
 
