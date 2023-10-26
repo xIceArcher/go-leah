@@ -105,18 +105,15 @@ var (
 
 func NewBaseAPI(cfg *config.TwitterConfig) *BaseAPI {
 	apiSetupOnce.Do(func() {
-		client = &retryablehttp.Client{
-			HTTPClient: &http.Client{
-				Timeout: 30 * time.Second,
-			},
-			CheckRetry: func(ctx context.Context, resp *http.Response, err error) (bool, error) {
-				// For some reason, the fxtwitter API will return 404 randomly
-				if resp.StatusCode == http.StatusNotFound {
-					return true, nil
-				}
+		client = retryablehttp.NewClient()
+		client.HTTPClient.Timeout = 30 * time.Second
+		client.CheckRetry = func(ctx context.Context, resp *http.Response, err error) (bool, error) {
+			// For some reason, the fxtwitter API will return 404 randomly
+			if resp.StatusCode == http.StatusNotFound {
+				return true, nil
+			}
 
-				return retryablehttp.DefaultRetryPolicy(ctx, resp, err)
-			},
+			return retryablehttp.DefaultRetryPolicy(ctx, resp, err)
 		}
 	})
 
