@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/xIceArcher/go-leah/cache"
 	"github.com/xIceArcher/go-leah/config"
 	"go.uber.org/zap"
@@ -97,15 +98,25 @@ func (a *CachedAPI) GetTweet(id string) (*Tweet, error) {
 type BaseAPI struct{}
 
 var (
-	client *http.Client
+	client *retryablehttp.Client
 
 	apiSetupOnce sync.Once
 )
 
 func NewBaseAPI(cfg *config.TwitterConfig) *BaseAPI {
 	apiSetupOnce.Do(func() {
-		client = &http.Client{
-			Timeout: 30 * time.Second,
+		client = &retryablehttp.Client{
+			HTTPClient: &http.Client{
+				Timeout: 30 * time.Second,
+			},
+			CheckRetry: func(ctx context.Context, resp *http.Response, err error) (bool, error) {
+				// For some reason, the fxtwitter API will return 404 randomly
+				if resp.StatusCode == http.StatusNotFound {
+					return true, nil
+				}
+
+				return retryablehttp.DefaultRetryPolicy(ctx, resp, err)
+			},
 		}
 	})
 
