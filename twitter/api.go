@@ -18,13 +18,6 @@ import (
 )
 
 const (
-	tweetModeExtended = "extended"
-
-	v2APIBaseURL     = "https://api.twitter.com/2"
-	v2APIGetSpaceURL = v2APIBaseURL + "/spaces"
-)
-
-const (
 	CacheKeyTwitterAPITweetFormat = "go-leah/twitterAPI/tweet/%s"
 )
 
@@ -115,6 +108,7 @@ func NewBaseAPI(cfg *config.TwitterConfig) *BaseAPI {
 
 			return retryablehttp.DefaultRetryPolicy(ctx, resp, err)
 		}
+		client.Logger = nil
 	})
 
 	return &BaseAPI{}

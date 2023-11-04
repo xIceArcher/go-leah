@@ -7,19 +7,11 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/consts"
-	"github.com/xIceArcher/go-leah/discord"
 	"github.com/xIceArcher/go-leah/utils"
 )
 
 func (v *Video) GetEmbed() *discordgo.MessageEmbed {
 	textWithEntities := &utils.TextWithEntities{Text: v.Description}
-	textWithEntities.AddEntities(func(u *utils.Entity) string {
-		return discord.GetNamedLink(u.Match, GetTagURL(u.Match[1:]))
-	}, v.Tags...)
-	textWithEntities.AddEntities(func(u *utils.Entity) string {
-		return discord.GetNamedLink(u.Match, GetMentionURL(u.Match[1:]))
-	}, v.Mentions...)
-
 	segmentedText := textWithEntities.GetReplacedText(4096, 1)
 
 	return &discordgo.MessageEmbed{
@@ -35,7 +27,7 @@ func (v *Video) GetEmbed() *discordgo.MessageEmbed {
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Music",
-				Value: discord.GetNamedLink(v.Music.String(), v.Music.URL()),
+				Value: v.Music.String(),
 			},
 			{
 				Name:   "Likes",

@@ -1,63 +1,99 @@
 package tiktok
 
 import (
+	"cmp"
 	"fmt"
 	"io"
-	"net/url"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/xIceArcher/go-leah/utils"
 )
 
-type TiktokResp struct {
-	RawItem map[string]RawItem `json:"ItemModule"`
-	RawUser struct {
-		Users map[string]RawUser `json:"users"`
-	} `json:"UserModule"`
-}
-
-type RawItem struct {
-	CreateTime     string          `json:"createTime"`
-	AuthorUniqueID string          `json:"author"`
-	Description    string          `json:"desc"`
-	Music          RawMusic        `json:"music"`
-	Video          RawVideo        `json:"video"`
-	Stats          RawStats        `json:"stats"`
-	TextExtra      []*RawTextExtra `json:"textExtra"`
-}
-
 type RawVideo struct {
-	DownloadAddr string `json:"downloadAddr"`
+	ID          string `json:"id"`
+	Description string `json:"description"`
+	Timestamp   int64  `json:"timestamp"`
+
+	LikeCount    uint64 `json:"like_count"`
+	RepostCount  uint64 `json:"repost_count"`
+	CommentCount uint64 `json:"comment_count"`
+
+	Uploader   string `json:"uploader"`
+	UploaderID string `json:"uploader_id"`
+	Creator    string `json:"creator"`
+
+	Track  string `json:"track"`
+	Artist string `json:"artist"`
+
+	Formats []*RawFormat `json:"formats"`
 }
 
-type RawMusic struct {
-	ID         string `json:"id"`
-	Album      string `json:"album"`
-	AuthorName string `json:"authorName"`
-	Title      string `json:"title"`
+func (v *RawVideo) GetSortedFormats() []*RawFormat {
+	slices.SortFunc(v.Formats, func(a, b *RawFormat) int {
+		typeCmp := cmp.Compare(a.DeduceType(), b.DeduceType())
+		if typeCmp != 0 {
+			return typeCmp
+		}
+
+		if !a.IsWatermarked() && b.IsWatermarked() {
+			return -1
+		}
+
+		if a.IsWatermarked() && !b.IsWatermarked() {
+			return 1
+		}
+
+		if !a.IsFromAPI() && b.IsFromAPI() {
+			return -1
+		}
+
+		if a.IsFromAPI() && !b.IsFromAPI() {
+			return 1
+		}
+
+		return 0
+	})
+
+	return v.Formats
 }
 
-type RawStats struct {
-	CommentCount uint64 `json:"commentCount"`
-	DiggCount    uint64 `json:"diggCount"`
-	ShareCount   uint64 `json:"shareCount"`
+type RawFormat struct {
+	URL         string            `json:"url"`
+	Cookies     string            `json:"cookies"`
+	HTTPHeaders map[string]string `json:"http_headers"`
+	FormatNote  string            `json:"format_note"`
 }
 
-type RawUser struct {
-	ID           string `json:"id"`
-	UniqueID     string `json:"uniqueId"`
-	Nickname     string `json:"Nickname"`
-	AvatarLarger string `json:"avatarLarger"`
-	AvatarMedium string `json:"avatarMedium"`
-	AvatarThumb  string `json:"avatarThumb"`
+type RawFormatType int
+
+const (
+	RawFormatTypeDownload RawFormatType = 1
+	RawFormatTypeDirect   RawFormatType = 2
+	RawFormatTypePlayback RawFormatType = 3
+	RawFormatTypeUnknown  RawFormatType = 4
+)
+
+func (f *RawFormat) IsWatermarked() bool {
+	return strings.Contains(strings.ToLower(f.FormatNote), "watermark")
 }
 
-type RawTextExtra struct {
-	Start        int    `json:"start"`
-	End          int    `json:"end"`
-	HashtagName  string `json:"hashtagName"`
-	UserUniqueID string `json:"userUniqueId"`
+func (f *RawFormat) IsFromAPI() bool {
+	return strings.Contains(strings.ToLower(f.FormatNote), "api")
+}
+
+func (f *RawFormat) DeduceType() RawFormatType {
+	formatNote := strings.ToLower(f.FormatNote)
+	if strings.Contains(formatNote, "download") {
+		return RawFormatTypeDownload
+	} else if strings.Contains(formatNote, "direct") {
+		return RawFormatTypeDirect
+	} else if strings.Contains(formatNote, "playback") {
+		return RawFormatTypePlayback
+	}
+
+	return RawFormatTypeUnknown
 }
 
 type Video struct {
@@ -92,10 +128,6 @@ type Music struct {
 func (m *Music) String() string {
 	title := strings.TrimSuffix(m.Title, fmt.Sprintf(" - %s", m.AuthorName))
 	return fmt.Sprintf("%s - %s", title, m.AuthorName)
-}
-
-func (m *Music) URL() string {
-	return fmt.Sprintf("https://www.tiktok.com/music/%s-%s", url.PathEscape(m.Title), m.ID)
 }
 
 type User struct {

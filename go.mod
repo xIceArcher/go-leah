@@ -1,6 +1,6 @@
 module github.com/xIceArcher/go-leah
 
-go 1.18
+go 1.21
 
 require (
 	github.com/bwmarrin/discordgo v0.24.0
