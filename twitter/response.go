@@ -73,9 +73,11 @@ func (t *rawTweet) ToDTO() *Tweet {
 		}
 	}
 
-	videoURL := ""
+	videoURLs := make([]string, 0)
 	if t.Media != nil && len(t.Media.Videos) > 0 {
-		videoURL = t.Media.Videos[0].URL
+		for _, video := range t.Media.Videos {
+			videoURLs = append(videoURLs, video.URL)
+		}
 	}
 
 	return &Tweet{
@@ -89,11 +91,8 @@ func (t *rawTweet) ToDTO() *Tweet {
 		Text:      t.Text,
 		Timestamp: time.Unix(int64(t.CreatedTimestamp), 0),
 
-		HasPhotos: t.Media != nil && len(t.Media.Photos) > 0,
 		PhotoURLs: photoURLs,
-
-		HasVideo: t.Media != nil && len(t.Media.Videos) > 0,
-		VideoURL: videoURL,
+		VideoURLs: videoURLs,
 
 		IsRetweet:       false,
 		RetweetedStatus: nil,

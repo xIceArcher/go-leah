@@ -197,7 +197,7 @@ func (m *YoutubeLiveStreamMatcher) watchVideoTask(cacheKey string, video *youtub
 					},
 					{
 						Name:   "Duration",
-						Value:  "~" + utils.FormatDurationSimple(time.Now().Sub(startTime)),
+						Value:  "~" + utils.FormatDurationSimple(time.Since(startTime)),
 						Inline: true,
 					},
 				}

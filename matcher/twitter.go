@@ -2,7 +2,6 @@ package matcher
 
 import (
 	"context"
-	"time"
 
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/discord"
@@ -23,8 +22,6 @@ func NewTwitterPostMatcher(cfg *config.Config, s *discord.Session) (Matcher, err
 }
 
 func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSession, matches []string) {
-	time.Sleep(5 * time.Second)
-	
 	existingEmbeds, err := s.GetMessageEmbeds()
 	if err != nil {
 		s.Logger.With(zap.Error(err)).Warn("Failed to get message embeds")
@@ -51,15 +48,19 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 	// Whole embed is missing or corrupted
 	if len(existingEmbeds) == 0 || existingEmbeds[0].Author == nil {
 		s.SendEmbeds(tweet.GetEmbeds())
-		s.SendVideoURL(tweet.VideoURL, s.Message.ID)
+		for _, videoURL := range tweet.VideoURLs {
+			s.SendVideoURL(videoURL, s.Message.ID)
+		}
 		return
 	}
 
-	if tweet.HasPhotos && existingEmbeds[0].Image == nil {
+	if tweet.HasPhotos() && existingEmbeds[0].Image == nil {
 		s.SendEmbeds(tweet.GetEmbeds())
 	}
 
-	if tweet.HasVideo && existingEmbeds[0].Video == nil {
-		s.SendVideoURL(tweet.VideoURL, s.Message.ID)
+	if tweet.HasVideos() && existingEmbeds[0].Video == nil {
+		for _, videoURL := range tweet.VideoURLs {
+			s.SendVideoURL(videoURL, s.Message.ID)
+		}
 	}
 }

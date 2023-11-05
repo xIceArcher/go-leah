@@ -57,8 +57,10 @@ func (c *TwitterCog) Embed(ctx context.Context, s *discord.MessageSession, args 
 	}
 
 	s.SendEmbeds(tweet.GetEmbeds())
-	if tweet.HasVideo {
-		s.SendVideoURL(tweet.VideoURL, s.Message.ID)
+	if tweet.HasVideos() {
+		for _, videoURL := range tweet.VideoURLs {
+			s.SendVideoURL(videoURL, s.Message.ID)
+		}
 	}
 }
 
@@ -69,7 +71,7 @@ func (c *TwitterCog) Photos(ctx context.Context, s *discord.MessageSession, args
 		return
 	}
 
-	if !tweet.HasPhotos {
+	if !tweet.HasPhotos() {
 		s.SendError(ErrTwitterPhotosNotFound)
 		return
 	}
@@ -88,12 +90,14 @@ func (c *TwitterCog) Video(ctx context.Context, s *discord.MessageSession, args 
 		return
 	}
 
-	if !tweet.HasVideo {
+	if !tweet.HasVideos() {
 		s.SendError(ErrTwitterVideoNotFound)
 		return
 	}
 
-	s.SendVideoURL(tweet.VideoURL, s.Message.ID)
+	for _, videoURL := range tweet.VideoURLs {
+		s.SendVideoURL(videoURL, s.Message.ID)
+	}
 }
 
 func (c *TwitterCog) Quoted(ctx context.Context, s *discord.MessageSession, args []string) {
@@ -109,8 +113,10 @@ func (c *TwitterCog) Quoted(ctx context.Context, s *discord.MessageSession, args
 	}
 
 	s.SendEmbeds(tweet.QuotedStatus.GetEmbeds())
-	if tweet.QuotedStatus.HasVideo {
-		s.SendVideoURL(tweet.QuotedStatus.VideoURL, s.Message.ID)
+	if tweet.QuotedStatus.HasVideos() {
+		for _, videoURL := range tweet.QuotedStatus.VideoURLs {
+			s.SendVideoURL(videoURL, s.Message.ID)
+		}
 	}
 }
 

@@ -18,11 +18,9 @@ type Tweet struct {
 	Text      string
 	Timestamp time.Time
 
-	HasPhotos bool
 	PhotoURLs []string
 
-	HasVideo bool
-	VideoURL string
+	VideoURLs []string
 
 	IsRetweet       bool
 	RetweetedStatus *Tweet
@@ -57,6 +55,14 @@ func (t *Tweet) GetBaseID() string {
 	}
 
 	return t.ID
+}
+
+func (t *Tweet) HasPhotos() bool {
+	return len(t.PhotoURLs) > 0
+}
+
+func (t *Tweet) HasVideos() bool {
+	return len(t.VideoURLs) > 0
 }
 
 type User struct {
