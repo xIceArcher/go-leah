@@ -1,10 +1,8 @@
 package tiktok
 
 import (
-	"cmp"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 	"time"
 
@@ -28,35 +26,6 @@ type RawVideo struct {
 	Artist string `json:"artist"`
 
 	Formats []*RawFormat `json:"formats"`
-}
-
-func (v *RawVideo) GetSortedFormats() []*RawFormat {
-	slices.SortFunc(v.Formats, func(a, b *RawFormat) int {
-		typeCmp := cmp.Compare(a.DeduceType(), b.DeduceType())
-		if typeCmp != 0 {
-			return typeCmp
-		}
-
-		if !a.IsWatermarked() && b.IsWatermarked() {
-			return -1
-		}
-
-		if a.IsWatermarked() && !b.IsWatermarked() {
-			return 1
-		}
-
-		if !a.IsFromAPI() && b.IsFromAPI() {
-			return -1
-		}
-
-		if a.IsFromAPI() && !b.IsFromAPI() {
-			return 1
-		}
-
-		return 0
-	})
-
-	return v.Formats
 }
 
 type RawFormat struct {
