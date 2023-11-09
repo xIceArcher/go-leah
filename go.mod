@@ -3,6 +3,7 @@ module github.com/xIceArcher/go-leah
 go 1.21
 
 require (
+	github.com/anaskhan96/soup v1.2.5
 	github.com/bwmarrin/discordgo v0.24.0
 	github.com/docker/go-units v0.4.0
 	github.com/go-redis/redis/v8 v8.11.4

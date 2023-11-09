@@ -51,6 +51,24 @@ func (f *RawFormat) IsWatermarked() bool {
 	return strings.Contains(strings.ToLower(f.FormatNote), "watermark")
 }
 
+type RawUser struct {
+	DefaultScope struct {
+		WebappUserDetail struct {
+			UserInfo struct {
+				User struct {
+					ID           string `json:"id"`
+					ShortID      string `json:"shortId"`
+					UniqueID     string `json:"uniqueId"`
+					Nickname     string `json:"nickname"`
+					AvatarLarger string `json:"avatarLarger"`
+					AvatarMedium string `json:"avatarMedium"`
+					AvatarThumb  string `json:"avatarThumb"`
+				} `json:"user"`
+			} `json:"userInfo"`
+		} `json:"webapp.user-detail"`
+	} `json:"__DEFAULT_SCOPE__"`
+}
+
 type Video struct {
 	ID          string
 	Description string

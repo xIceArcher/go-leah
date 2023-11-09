@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/anaskhan96/soup"
 	"github.com/xIceArcher/go-leah/config"
 )
 
@@ -17,7 +18,7 @@ func NewAPI(cfg *config.TiktokConfig) (*API, error) {
 	return &API{}, nil
 }
 
-func (API) GetVideo(postID string) (*Video, error) {
+func (a *API) GetVideo(postID string) (*Video, error) {
 	cmd := exec.Command("yt-dlp", fmt.Sprintf("https://www.tiktok.com/@a/video/%s", postID), "-j")
 	out := &bytes.Buffer{}
 	cmd.Stdout = out
@@ -68,6 +69,15 @@ func (API) GetVideo(postID string) (*Video, error) {
 		return nil, fmt.Errorf("failed to get videos")
 	}
 
+	author, err := a.GetUser(rawResp.Uploader)
+	if err != nil {
+		author = &User{
+			ID:       rawResp.UploaderID,
+			UniqueID: rawResp.Uploader,
+			Nickname: rawResp.Creator,
+		}
+	}
+
 	return &Video{
 		ID:          rawResp.ID,
 		Description: rawResp.Description,
@@ -76,14 +86,38 @@ func (API) GetVideo(postID string) (*Video, error) {
 			AuthorName: rawResp.Artist,
 			Title:      rawResp.Track,
 		},
-		Author: &User{
-			ID:       rawResp.UploaderID,
-			UniqueID: rawResp.Uploader,
-			Nickname: rawResp.Creator,
-		},
+		Author:       author,
 		LikeCount:    rawResp.LikeCount,
 		CommentCount: rawResp.CommentCount,
 		ShareCount:   rawResp.RepostCount,
 		CreateTime:   time.Unix(rawResp.Timestamp, 0),
+	}, nil
+}
+
+func (API) GetUser(userID string) (*User, error) {
+	resp, err := soup.Get(fmt.Sprintf("https://www.tiktok.com/@%s", userID))
+	if err != nil {
+		return nil, err
+	}
+
+	element := soup.HTMLParse(resp).Find("script", "id", "__UNIVERSAL_DATA_FOR_REHYDRATION__")
+	if element.Pointer == nil {
+		return nil, fmt.Errorf("could not find element")
+	}
+	if element.Pointer.FirstChild == nil {
+		return nil, fmt.Errorf("could not find child of element")
+	}
+
+	rawUserResp := &RawUser{}
+	if err := json.Unmarshal([]byte(element.Pointer.FirstChild.Data), rawUserResp); err != nil {
+		return nil, err
+	}
+	rawUser := rawUserResp.DefaultScope.WebappUserDetail.UserInfo.User
+
+	return &User{
+		ID:        rawUser.ID,
+		UniqueID:  rawUser.UniqueID,
+		Nickname:  rawUser.Nickname,
+		AvatarURL: rawUser.AvatarLarger,
 	}, nil
 }
