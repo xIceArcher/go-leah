@@ -2,7 +2,6 @@ package tiktok
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	"github.com/xIceArcher/go-leah/config"
-	"gopkg.in/vansante/go-ffprobe.v2"
 )
 
 type API struct{}
@@ -39,16 +37,7 @@ func (API) GetVideo(postID string) (*Video, error) {
 			continue
 		}
 
-		ffprobeData, err := ffprobe.ProbeURL(context.Background(), format.URL)
-		if err != nil {
-			continue
-		}
-
-		if len(ffprobeData.Streams) == 0 {
-			continue
-		}
-
-		if ffprobeData.Streams[0].CodecName == "hevc" {
+		if format.VideoCodec == "h265" {
 			continue
 		}
 

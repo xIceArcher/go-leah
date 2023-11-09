@@ -23,7 +23,6 @@ require (
 	golang.org/x/exp v0.0.0-20220317015231-48e79f11773a
 	google.golang.org/api v0.60.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	gopkg.in/vansante/go-ffprobe.v2 v2.1.1
 )
 
 require (

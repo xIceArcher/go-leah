@@ -29,10 +29,13 @@ type RawVideo struct {
 }
 
 type RawFormat struct {
-	URL         string            `json:"url"`
-	Cookies     string            `json:"cookies"`
+	URL string `json:"url"`
+
 	HTTPHeaders map[string]string `json:"http_headers"`
-	FormatNote  string            `json:"format_note"`
+	Cookies     string            `json:"cookies"`
+
+	FormatNote string `json:"format_note"`
+	VideoCodec string `json:"vcodec"`
 }
 
 type RawFormatType int
@@ -46,23 +49,6 @@ const (
 
 func (f *RawFormat) IsWatermarked() bool {
 	return strings.Contains(strings.ToLower(f.FormatNote), "watermark")
-}
-
-func (f *RawFormat) IsFromAPI() bool {
-	return strings.Contains(strings.ToLower(f.FormatNote), "api")
-}
-
-func (f *RawFormat) DeduceType() RawFormatType {
-	formatNote := strings.ToLower(f.FormatNote)
-	if strings.Contains(formatNote, "download") {
-		return RawFormatTypeDownload
-	} else if strings.Contains(formatNote, "direct") {
-		return RawFormatTypeDirect
-	} else if strings.Contains(formatNote, "playback") {
-		return RawFormatTypePlayback
-	}
-
-	return RawFormatTypeUnknown
 }
 
 type Video struct {
