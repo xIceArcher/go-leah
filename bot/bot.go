@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"runtime/debug"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/xIceArcher/go-leah/config"
@@ -42,6 +43,7 @@ func New(cfg *config.Config, intents discordgo.Intent, logger *zap.SugaredLogger
 		return nil, err
 	}
 	session.Identify.Intents = intents
+	session.Client.Timeout = time.Minute
 
 	return &Bot{
 		Session: discord.NewSession(session, logger),
