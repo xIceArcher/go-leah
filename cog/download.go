@@ -63,6 +63,7 @@ func (c *DownloadCog) Streamlink(ctx context.Context, s *discord.MessageSession,
 	type Args struct {
 		HTTPHeader  string `short:"h" long:"header"`
 		HTTPCookies string `short:"c" long:"cookie"`
+		Delete      bool   `short:"d" long:"delete"`
 
 		Args struct {
 			M3U8URLStr string `required:"yes"`
@@ -148,15 +149,23 @@ func (c *DownloadCog) Streamlink(ctx context.Context, s *discord.MessageSession,
 		}
 
 		if c.qnapConfig.IsEnabled {
-			if err := handleUpload(c.qnapConfig, s, commandArgs.Args.FileName, downloadedRuns); err != nil {
+			fileSize, err := handleUpload(c.qnapConfig, s, commandArgs.Args.FileName, downloadedRuns)
+			if err != nil {
 				s.SendError(err)
 				return
+			}
+
+			if commandArgs.Delete {
+				s.SendMessage(fmt.Sprintf("Clearing disk space (%s)...", units.HumanSize(float64(fileSize))))
+				if err := os.RemoveAll(dir); err != nil {
+					s.SendError(err)
+					return
+				}
 			}
 		}
 
 		c.Disk(ctx, s, []string{})
 	}
-
 }
 
 type DownloadedFile struct {
@@ -484,7 +493,7 @@ func downloadSegment(ctx context.Context, cfg *PlaylistConfig, client *retryable
 	}
 }
 
-func handleUpload(qnapConfig *config.QNAPConfig, s *discord.MessageSession, fileNameStr string, downloadedRuns [][]string) error {
+func handleUpload(qnapConfig *config.QNAPConfig, s *discord.MessageSession, fileNameStr string, downloadedRuns [][]string) (int64, error) {
 	extension := path.Ext(fileNameStr)
 	fileName := strings.TrimSuffix(fileNameStr, extension)
 
@@ -495,17 +504,20 @@ func handleUpload(qnapConfig *config.QNAPConfig, s *discord.MessageSession, file
 	if len(downloadedRuns) == 1 {
 		return uploadAndConcatFiles(qnapConfig, s, fmt.Sprintf("%s%s", fileName, extension), downloadedRuns[0])
 	} else {
+		var totalFileSize int64
 		for runNo, run := range downloadedRuns {
 			runFileName := fmt.Sprintf("%s_%v%s", fileName, runNo+1, extension)
-			if err := uploadAndConcatFiles(qnapConfig, s, runFileName, run); err != nil {
-				return err
+			currFileSize, err := uploadAndConcatFiles(qnapConfig, s, runFileName, run)
+			if err != nil {
+				return totalFileSize, err
 			}
+			totalFileSize += currFileSize
 		}
-		return nil
+		return totalFileSize, nil
 	}
 }
 
-func uploadAndConcatFiles(qnapConfig *config.QNAPConfig, s *discord.MessageSession, fileName string, filePaths []string) error {
+func uploadAndConcatFiles(qnapConfig *config.QNAPConfig, s *discord.MessageSession, fileName string, filePaths []string) (int64, error) {
 	bar, err := s.SendBytesProgressBar(1*units.TiB, fmt.Sprintf("Uploading %s", fileName))
 	if err != nil {
 		msg := "Failed to initialize progress bar"
@@ -515,11 +527,11 @@ func uploadAndConcatFiles(qnapConfig *config.QNAPConfig, s *discord.MessageSessi
 
 	qnapAPI, err := qnap.New(qnapConfig.URL, s.Logger)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if err := qnapAPI.Login(qnapConfig.Username, qnapConfig.Password); err != nil {
-		return err
+		return 0, err
 	}
 	defer qnapAPI.Logout()
 

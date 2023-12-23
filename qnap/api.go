@@ -22,7 +22,7 @@ type API interface {
 	Logout() error
 	CreateDir(rootDir string, dirName string) error
 	UploadMany(dir string, filePaths []string, progressBar ...progress.Bar) error
-	UploadAndConcat(dir string, fileName string, filePaths []string, progressBar ...progress.Bar) error
+	UploadAndConcat(dir string, fileName string, filePaths []string, progressBar ...progress.Bar) (int64, error)
 	GetFileSize(path string, fileName string) (int64, error)
 	Exists(path string, fileName string) (bool, error)
 }
@@ -172,19 +172,19 @@ func (a *QNAPAPI) UploadMany(dirName string, filePaths []string, bar ...progress
 	return nil
 }
 
-func (a *QNAPAPI) UploadAndConcat(uploadDir string, fileName string, filePaths []string, bar ...progress.Bar) error {
+func (a *QNAPAPI) UploadAndConcat(uploadDir string, fileName string, filePaths []string, bar ...progress.Bar) (int64, error) {
 	var progressBar progress.Bar
 	if len(bar) > 0 {
 		progressBar = bar[0]
 	}
 
 	if a.sessionID == "" {
-		return ErrNotLoggedIn
+		return 0, ErrNotLoggedIn
 	}
 
 	fileInfos, totalBytes, err := getFileSizes(filePaths)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if progressBar != nil {
@@ -203,11 +203,11 @@ func (a *QNAPAPI) UploadAndConcat(uploadDir string, fileName string, filePaths [
 		SetResult(startChunkedUploadResp).
 		Post(a.utilRequestPath())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if startChunkedUploadResp.Status != StatusStartChunkedUploadOK {
-		return ErrFailed
+		return 0, ErrFailed
 	}
 
 	var offset int64
@@ -267,14 +267,14 @@ func (a *QNAPAPI) UploadAndConcat(uploadDir string, fileName string, filePaths [
 
 	actualFileSize, err := a.GetFileSize(uploadDir, fileName)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if actualFileSize != totalBytes {
-		return ErrFailed
+		return 0, ErrFailed
 	}
 
-	return nil
+	return actualFileSize, nil
 }
 
 func (a *QNAPAPI) GetFileSize(path string, fileName string) (int64, error) {
