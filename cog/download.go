@@ -149,14 +149,13 @@ func (c *DownloadCog) Streamlink(ctx context.Context, s *discord.MessageSession,
 		}
 
 		if c.qnapConfig.IsEnabled {
-			fileSize, err := handleUpload(c.qnapConfig, s, commandArgs.Args.FileName, downloadedRuns)
-			if err != nil {
+			if _, err := handleUpload(c.qnapConfig, s, commandArgs.Args.FileName, downloadedRuns); err != nil {
 				s.SendError(err)
 				return
 			}
 
 			if commandArgs.Delete {
-				s.SendMessage(fmt.Sprintf("Clearing disk space (%s)...", units.HumanSize(float64(fileSize))))
+				s.SendMessage("Clearing disk space...")
 				if err := os.RemoveAll(dir); err != nil {
 					s.SendError(err)
 					return
