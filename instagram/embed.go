@@ -14,6 +14,13 @@ const (
 	MAX_EMBEDS_PER_POST = 4
 )
 
+var (
+	instagramFooter = &discordgo.MessageEmbedFooter{
+		Text:    "Instagram",
+		IconURL: "https://www.instagram.com/static/images/ico/favicon-192.png/68d99ba29cc8.png",
+	}
+)
+
 func (p *Post) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 	textWithEntities := &utils.TextWithEntities{Text: p.Text}
 	textWithEntities.AddByRegex(MentionRegex, func(s string) string {
@@ -71,10 +78,7 @@ func (p *Post) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 		}
 	}
 
-	embeds[footerEmbedIdx].Footer = &discordgo.MessageEmbedFooter{
-		Text:    "Instagram",
-		IconURL: "https://www.instagram.com/static/images/ico/favicon-192.png/68d99ba29cc8.png",
-	}
+	embeds[footerEmbedIdx].Footer = instagramFooter
 	embeds[footerEmbedIdx].Timestamp = p.Timestamp.Format(time.RFC3339)
 
 	return embeds
@@ -89,11 +93,8 @@ func (s *Story) GetEmbed() *discordgo.MessageEmbed {
 			URL:     s.Owner.URL(),
 			IconURL: s.Owner.ProfilePicURL,
 		},
-		Color: utils.ParseHexColor(consts.ColorInsta),
-		Footer: &discordgo.MessageEmbedFooter{
-			Text:    "Instagram",
-			IconURL: "https://instagram-brand.com/wp-content/uploads/2016/11/Instagram_AppIcon_Aug2017.png?w=300",
-		},
+		Color:     utils.ParseHexColor(consts.ColorInsta),
+		Footer:    instagramFooter,
 		Timestamp: s.Timestamp.Format(time.RFC3339),
 	}
 
