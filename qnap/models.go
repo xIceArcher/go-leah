@@ -6,9 +6,14 @@ type StatusMixin struct {
 	Status Status `json:"status"`
 }
 
-type LoginResponse struct {
+type V4_1LoginResponse struct {
 	StatusMixin
 	SID string `json:"sid"`
+}
+
+type V5LoginResponse struct {
+	AuthSid    string `xml:"authSid"`
+	AuthPassed bool   `xml:"authPassed"`
 }
 
 type CreateDirResponse struct {

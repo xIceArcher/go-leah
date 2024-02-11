@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"time"
 
 	"github.com/docker/go-units"
 	"github.com/go-resty/resty/v2"
@@ -18,8 +19,8 @@ import (
 )
 
 type API interface {
-	Login(username string, password string) error
-	Logout() error
+	APIAuthenticator
+
 	CreateDir(rootDir string, dirName string) error
 	UploadMany(dir string, filePaths []string, progressBar ...progress.Bar) error
 	UploadAndConcat(dir string, fileName string, filePaths []string, progressBar ...progress.Bar) (int64, error)
@@ -27,15 +28,21 @@ type API interface {
 	Exists(path string, fileName string) (bool, error)
 }
 
-type QNAPAPI struct {
+type APIAuthenticator interface {
+	Login(username string, password string) error
+	Logout() error
+
+	SessionID() string
+}
+
+type QNAPAPIAuthenticatorV4_1 struct {
 	url       string
 	sessionID string
 
 	client *resty.Client
-	logger *zap.SugaredLogger
 }
 
-func New(baseUrl string, logger *zap.SugaredLogger) (API, error) {
+func NewV4_1Authenticator(baseUrl string) (APIAuthenticator, error) {
 	u, err := url.Parse(baseUrl)
 	if err != nil {
 		return nil, err
@@ -50,16 +57,14 @@ func New(baseUrl string, logger *zap.SugaredLogger) (API, error) {
 			},
 		})
 
-	return &QNAPAPI{
-		client: client,
-
+	return &QNAPAPIAuthenticatorV4_1{
 		url:    u.String(),
-		logger: logger,
+		client: client,
 	}, nil
 }
 
-func (a *QNAPAPI) Login(username string, password string) error {
-	loginResp := &LoginResponse{}
+func (a *QNAPAPIAuthenticatorV4_1) Login(username string, password string) error {
+	loginResp := &V4_1LoginResponse{}
 	_, err := a.client.R().
 		SetQueryParams(map[string]string{
 			"user": username,
@@ -79,7 +84,7 @@ func (a *QNAPAPI) Login(username string, password string) error {
 	return nil
 }
 
-func (a *QNAPAPI) Logout() error {
+func (a *QNAPAPIAuthenticatorV4_1) Logout() error {
 	if a.sessionID == "" {
 		return nil
 	}
@@ -88,13 +93,115 @@ func (a *QNAPAPI) Logout() error {
 	return err
 }
 
+func (a *QNAPAPIAuthenticatorV4_1) SessionID() string {
+	return a.sessionID
+}
+
+type QNAPAPIAuthenticatorV5 struct {
+	url       string
+	sessionID string
+
+	client *resty.Client
+}
+
+func NewV5Authenticator(baseUrl string) (APIAuthenticator, error) {
+	u, err := url.Parse(baseUrl)
+	if err != nil {
+		return nil, err
+	}
+	u.Path = path.Join(u.Path, "cgi-bin")
+
+	client := resty.New().
+		SetTimeout(0).
+		SetTransport(&http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		})
+
+	return &QNAPAPIAuthenticatorV5{
+		url:    u.String(),
+		client: client,
+	}, nil
+}
+
+func (a *QNAPAPIAuthenticatorV5) Login(username string, password string) error {
+	loginResp := &V5LoginResponse{}
+	_, err := a.client.R().
+		SetQueryParams(map[string]string{
+			"user": username,
+			"pwd":  base64.StdEncoding.EncodeToString([]byte(password)),
+		}).
+		SetResult(loginResp).
+		Get(a.url + "/authLogin.cgi")
+	if err != nil {
+		return err
+	}
+
+	if !loginResp.AuthPassed {
+		return ErrFailed
+	}
+
+	a.sessionID = loginResp.AuthSid
+	return nil
+}
+
+func (a *QNAPAPIAuthenticatorV5) Logout() error {
+	return nil
+}
+
+func (a *QNAPAPIAuthenticatorV5) SessionID() string {
+	return a.sessionID
+}
+
+type QNAPAPI struct {
+	APIAuthenticator
+
+	url string
+
+	client *resty.Client
+	logger *zap.SugaredLogger
+}
+
+func New(baseUrl string, logger *zap.SugaredLogger) (API, error) {
+	defaultAuthenticator, err := NewV5Authenticator(baseUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewWithAuthenticator(baseUrl, logger, defaultAuthenticator)
+}
+
+func NewWithAuthenticator(baseUrl string, logger *zap.SugaredLogger, autheticator APIAuthenticator) (API, error) {
+	u, err := url.Parse(baseUrl)
+	if err != nil {
+		return nil, err
+	}
+	u.Path = path.Join(u.Path, "cgi-bin", "filemanager")
+
+	client := resty.New().
+		SetTimeout(0).
+		SetTransport(&http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		})
+
+	return &QNAPAPI{
+		APIAuthenticator: autheticator,
+		url:              u.String(),
+		client:           client,
+		logger:           logger,
+	}, nil
+}
+
 type FileInfo struct {
 	Path     string
 	NumBytes int64
 }
 
 func (a *QNAPAPI) CreateDir(rootDir string, dirName string) error {
-	if a.sessionID == "" {
+	if a.SessionID() == "" {
 		return ErrNotLoggedIn
 	}
 
@@ -126,7 +233,7 @@ func (a *QNAPAPI) UploadMany(dirName string, filePaths []string, bar ...progress
 		progressBar = bar[0]
 	}
 
-	if a.sessionID == "" {
+	if a.SessionID() == "" {
 		return ErrNotLoggedIn
 	}
 
@@ -178,7 +285,7 @@ func (a *QNAPAPI) UploadAndConcat(uploadDir string, fileName string, filePaths [
 		progressBar = bar[0]
 	}
 
-	if a.sessionID == "" {
+	if a.SessionID() == "" {
 		return 0, ErrNotLoggedIn
 	}
 
@@ -212,6 +319,8 @@ func (a *QNAPAPI) UploadAndConcat(uploadDir string, fileName string, filePaths [
 
 	var offset int64
 	for i, file := range fileInfos {
+		start := time.Now()
+
 		for {
 			chunkedUploadResp := &ChunkedUploadResponse{}
 			_, err := a.utilRequest().
@@ -252,6 +361,7 @@ func (a *QNAPAPI) UploadAndConcat(uploadDir string, fileName string, filePaths [
 			}
 
 			if offset+file.NumBytes != actualSize {
+				logger.Warnf("Expected %v bytes but got %v bytes", offset+file.NumBytes, actualSize)
 				continue
 			}
 
@@ -262,7 +372,7 @@ func (a *QNAPAPI) UploadAndConcat(uploadDir string, fileName string, filePaths [
 		if progressBar != nil {
 			progressBar.Add(file.NumBytes)
 		}
-		logger.Infof("Uploaded fragment %v/%v", i+1, len(fileInfos))
+		logger.With("took", time.Since(start)).Infof("Uploaded fragment %v/%v", i+1, len(fileInfos))
 	}
 
 	actualFileSize, err := a.GetFileSize(uploadDir, fileName)
@@ -278,7 +388,7 @@ func (a *QNAPAPI) UploadAndConcat(uploadDir string, fileName string, filePaths [
 }
 
 func (a *QNAPAPI) GetFileSize(path string, fileName string) (int64, error) {
-	if a.sessionID == "" {
+	if a.SessionID() == "" {
 		return 0, ErrNotLoggedIn
 	}
 
@@ -320,7 +430,7 @@ func (a *QNAPAPI) Exists(path string, fileName string) (bool, error) {
 }
 
 func (a *QNAPAPI) utilRequest() *resty.Request {
-	return a.client.R().SetQueryParam("sid", a.sessionID)
+	return a.client.R().SetQueryParam("sid", a.SessionID())
 }
 
 func (a *QNAPAPI) utilRequestPath() string {
