@@ -49,7 +49,7 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 	}
 
 	// Whole embed is missing or corrupted
-	if len(existingEmbeds) == 0 || existingEmbeds[0].Description == "" {
+	if len(existingEmbeds) == 0 || (existingEmbeds[0].Description == "" && tweet.Text != "") {
 		s.SendEmbeds(tweet.GetEmbeds())
 		for _, videoURL := range tweet.VideoURLs {
 			s.SendVideoURL(videoURL, s.Message.ID)
