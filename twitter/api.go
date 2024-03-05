@@ -102,7 +102,7 @@ func NewBaseAPI(cfg *config.TwitterConfig) *BaseAPI {
 		client.HTTPClient.Timeout = 30 * time.Second
 		client.CheckRetry = func(ctx context.Context, resp *http.Response, err error) (bool, error) {
 			// For some reason, the fxtwitter API will return 404 randomly
-			if resp.StatusCode == http.StatusNotFound {
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
 				return true, nil
 			}
 
