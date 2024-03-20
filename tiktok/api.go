@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"os"
 	"os/exec"
 	"time"
 
 	"github.com/anaskhan96/soup"
 	"github.com/xIceArcher/go-leah/config"
+	"go.uber.org/zap"
 )
 
 type API struct{}
@@ -19,7 +20,9 @@ func NewAPI(cfg *config.TiktokConfig) (*API, error) {
 }
 
 func (a *API) GetVideo(postID string) (*Video, error) {
-	cmd := exec.Command("yt-dlp", fmt.Sprintf("https://www.tiktok.com/@a/video/%s", postID), "-j")
+	url := fmt.Sprintf("https://www.tiktok.com/@a/video/%s", postID)
+
+	cmd := exec.Command("yt-dlp", url, "-j")
 	out := &bytes.Buffer{}
 	cmd.Stdout = out
 
@@ -32,41 +35,47 @@ func (a *API) GetVideo(postID string) (*Video, error) {
 		return nil, err
 	}
 
-	var vidResp *http.Response
+	var fileName string
 	for _, format := range rawResp.Formats {
+		logger := zap.S().With("format", format.Format)
+
 		if format.IsWatermarked() {
+			logger.Info("Watermarked")
 			continue
 		}
 
 		if format.VideoCodec == "h265" {
+			logger.Info("H265 codec")
 			continue
 		}
 
-		req, err := http.NewRequest(http.MethodGet, format.URL, nil)
+		file, err := os.CreateTemp("", fmt.Sprintf("*-%s.mp4", postID))
 		if err != nil {
+			logger.With(zap.Error(err)).Info("Failed to create temp file")
+			return nil, err
+		}
+
+		if err := file.Close(); err != nil {
+			logger.With(zap.Error(err)).Info("Failed to create temp file")
+			return nil, err
+		}
+
+		downloadCmd := exec.Command("yt-dlp", url, "-f", format.FormatID, "-o", file.Name(), "--force-overwrites")
+		downloadOut := &bytes.Buffer{}
+		cmd.Stdout = downloadOut
+
+		if err := downloadCmd.Run(); err != nil {
+			logger.With(zap.Error(err)).Info("Failed to run download command")
 			continue
 		}
 
-		for k, v := range format.HTTPHeaders {
-			req.Header.Add(k, v)
-		}
-		if format.Cookies != "" {
-			req.Header.Add("Cookie", format.Cookies)
-		}
-
-		currVidResp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			continue
-		}
-
-		if currVidResp.StatusCode == http.StatusOK {
-			vidResp = currVidResp
-			break
-		}
+		fileName = file.Name()
+		break
 	}
 
-	if vidResp == nil {
-		return nil, fmt.Errorf("failed to get videos")
+	file, err := os.Open(fileName)
+	if err != nil {
+		return nil, err
 	}
 
 	author, err := a.GetUser(rawResp.Uploader)
@@ -81,7 +90,7 @@ func (a *API) GetVideo(postID string) (*Video, error) {
 	return &Video{
 		ID:          rawResp.ID,
 		Description: rawResp.Description,
-		Video:       vidResp.Body,
+		Video:       file,
 		Music: &Music{
 			AuthorName: rawResp.Artist,
 			Title:      rawResp.Track,

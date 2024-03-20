@@ -29,7 +29,9 @@ type RawVideo struct {
 }
 
 type RawFormat struct {
-	URL string `json:"url"`
+	FormatID string `json:"format_id"`
+	Format   string `json:"format"`
+	URL      string `json:"url"`
 
 	HTTPHeaders map[string]string `json:"http_headers"`
 	Cookies     string            `json:"cookies"`
