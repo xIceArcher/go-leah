@@ -54,6 +54,7 @@ func (a *API) GetVideo(postID string) (*Video, error) {
 			logger.With(zap.Error(err)).Info("Failed to create temp file")
 			return nil, err
 		}
+		defer os.Remove(file.Name())
 
 		if err := file.Close(); err != nil {
 			logger.With(zap.Error(err)).Info("Failed to create temp file")
