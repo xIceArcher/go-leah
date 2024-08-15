@@ -20,6 +20,8 @@ func NewAPI(cfg *config.TiktokConfig) (*API, error) {
 }
 
 func (a *API) GetVideo(postID string) (*Video, error) {
+	logger := zap.S().With("postID", postID)
+
 	url := fmt.Sprintf("https://www.tiktok.com/@a/video/%s", postID)
 
 	cmd := exec.Command("yt-dlp", url, "-j")
@@ -34,31 +36,23 @@ func (a *API) GetVideo(postID string) (*Video, error) {
 	if err := json.NewDecoder(out).Decode(rawResp); err != nil {
 		return nil, err
 	}
+	rawResp.Formats.SortByQuality()
 
 	var fileName string
+	couldDownloadFormat := false
 	for _, format := range rawResp.Formats {
-		logger := zap.S().With("format", format.Format)
-
-		if format.IsWatermarked() {
-			logger.Info("Watermarked")
-			continue
-		}
-
-		if format.VideoCodec == "h265" {
-			logger.Info("H265 codec")
-			continue
-		}
+		logger := logger.With("format", format.Format)
 
 		file, err := os.CreateTemp("", fmt.Sprintf("*-%s.mp4", postID))
 		if err != nil {
 			logger.With(zap.Error(err)).Info("Failed to create temp file")
-			return nil, err
+			continue
 		}
 		defer os.Remove(file.Name())
 
 		if err := file.Close(); err != nil {
 			logger.With(zap.Error(err)).Info("Failed to create temp file")
-			return nil, err
+			continue
 		}
 
 		downloadCmd := exec.Command("yt-dlp", url, "-f", format.FormatID, "-o", file.Name(), "--force-overwrites")
@@ -71,7 +65,12 @@ func (a *API) GetVideo(postID string) (*Video, error) {
 		}
 
 		fileName = file.Name()
+		couldDownloadFormat = true
 		break
+	}
+
+	if !couldDownloadFormat {
+		return nil, fmt.Errorf("failed to download a single format")
 	}
 
 	file, err := os.Open(fileName)

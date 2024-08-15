@@ -1,8 +1,10 @@
 package tiktok
 
 import (
+	"cmp"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,7 +27,7 @@ type RawVideo struct {
 	Track  string `json:"track"`
 	Artist string `json:"artist"`
 
-	Formats []*RawFormat `json:"formats"`
+	Formats RawFormats `json:"formats"`
 }
 
 type RawFormat struct {
@@ -38,6 +40,9 @@ type RawFormat struct {
 
 	FormatNote string `json:"format_note"`
 	VideoCodec string `json:"vcodec"`
+
+	Width  int `json:"width"`
+	Height int `json:"height"`
 }
 
 type RawFormatType int
@@ -51,6 +56,32 @@ const (
 
 func (f *RawFormat) IsWatermarked() bool {
 	return strings.Contains(strings.ToLower(f.FormatNote), "watermark")
+}
+
+func (f *RawFormat) PixelCount() int {
+	return f.Width * f.Height
+}
+
+type RawFormats []*RawFormat
+
+func (fs *RawFormats) SortByQuality() {
+	slices.SortFunc(*fs, func(a, b *RawFormat) int {
+		if a.VideoCodec != b.VideoCodec {
+			if a.VideoCodec == "h265" {
+				return 1
+			} else if b.VideoCodec == "h265" {
+				return -1
+			}
+		}
+
+		if a.IsWatermarked() && !b.IsWatermarked() {
+			return 1
+		} else if !a.IsWatermarked() && b.IsWatermarked() {
+			return -1
+		}
+
+		return -cmp.Compare(a.PixelCount(), b.PixelCount())
+	})
 }
 
 type RawUser struct {
