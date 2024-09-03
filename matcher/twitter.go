@@ -57,7 +57,7 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 		return
 	}
 
-	if (tweet.HasPhotos() && existingEmbeds[0].Image == nil) || len(tweet.PhotoURLs) > 1 {
+	if (tweet.HasPhotos() && (existingEmbeds[0].Image == nil || tweet.Photos[0].AltText != "")) || len(tweet.Photos) > 1 {
 		s.SendEmbeds(tweet.GetEmbeds())
 	}
 

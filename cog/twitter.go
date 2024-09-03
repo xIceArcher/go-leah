@@ -76,7 +76,7 @@ func (c *TwitterCog) Photos(ctx context.Context, s *discord.MessageSession, args
 		return
 	}
 
-	if len(tweet.PhotoURLs) == 1 {
+	if len(tweet.Photos) == 1 {
 		return
 	}
 

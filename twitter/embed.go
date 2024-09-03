@@ -16,47 +16,75 @@ var twitterEmbedFooter = &discordgo.MessageEmbedFooter{
 	IconURL: "https://abs.twimg.com/icons/apple-touch-icon-192x192.png",
 }
 
-func (t *Tweet) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
+func (t *Tweet) GetEmbeds() []*discordgo.MessageEmbed {
+	var mainEmbed *discordgo.MessageEmbed
+	var relevantPhotos []*Photo
+
 	if t.IsReply {
-		embeds = append(embeds, t.replyMainEmbed())
+		mainEmbed = t.replyMainEmbed()
+		relevantPhotos = t.Photos
 	} else if t.IsRetweet {
-		embeds = append(embeds, t.retweetMainEmbed())
+		mainEmbed = t.retweetMainEmbed()
+		relevantPhotos = t.RetweetedStatus.Photos
 	} else if t.IsQuoted {
-		embeds = append(embeds, t.quotedMainEmbed())
+		mainEmbed = t.quotedMainEmbed()
+
+		if len(t.Photos) > 0 {
+			relevantPhotos = t.Photos
+		} else if len(t.QuotedStatus.Photos) > 0 {
+			relevantPhotos = t.QuotedStatus.Photos
+		}
 	} else {
-		embeds = append(embeds, t.standardMainEmbed())
+		mainEmbed = t.standardMainEmbed()
+		relevantPhotos = t.Photos
 	}
 
-	embeds[0].Author = t.User.GetEmbed()
-
-	if t.IsRetweet && len(t.RetweetedStatus.PhotoURLs) > 1 {
-		embeds = append(embeds, t.RetweetedStatus.GetPhotoEmbeds()[1:]...)
-	} else if len(t.PhotoURLs) > 1 {
-		embeds = append(embeds, t.GetPhotoEmbeds()[1:]...)
+	altTextField := &discordgo.MessageEmbedField{
+		Name: "Alt Text",
 	}
 
-	embeds[0].Footer = twitterEmbedFooter
+	otherEmbeds := make([]*discordgo.MessageEmbed, 0)
+	for i, photo := range relevantPhotos {
+		if i == 0 {
+			mainEmbed.Image = &discordgo.MessageEmbedImage{
+				URL: photo.URL,
+			}
+		} else {
+			photoEmbed := photo.GetEmbed()
+			photoEmbed.URL = t.URL()
+
+			otherEmbeds = append(otherEmbeds, photoEmbed)
+		}
+
+		if photo.AltText != "" {
+			altTextField.Value += discord.GetNamedLink(fmt.Sprintf("Image %v", i+1), photo.URL) + "\n" + photo.AltText + "\n\n"
+		}
+	}
+
+	altTextField.Value = strings.TrimSpace(altTextField.Value)
+	if altTextField.Value != "" {
+		mainEmbed.Fields = append(mainEmbed.Fields, altTextField)
+	}
+
+	mainEmbed.Author = t.User.GetEmbed()
+
+	mainEmbed.Footer = twitterEmbedFooter
 	if t.Timestamp.Unix() != 0 {
-		embeds[0].Timestamp = t.Timestamp.Format(time.RFC3339)
+		mainEmbed.Timestamp = t.Timestamp.Format(time.RFC3339)
 	}
+
+	embeds := []*discordgo.MessageEmbed{mainEmbed}
+	embeds = append(embeds, otherEmbeds...)
 	return embeds
 }
 
 func (t *Tweet) standardMainEmbed() *discordgo.MessageEmbed {
-	embed := &discordgo.MessageEmbed{
+	return &discordgo.MessageEmbed{
 		URL:         t.URL(),
 		Title:       fmt.Sprintf("Tweet by %s", t.User.Name),
 		Description: t.GetTextWithEmbeds(),
 		Color:       utils.ParseHexColor(consts.ColorTwitter),
 	}
-
-	if len(t.PhotoURLs) != 0 {
-		embed.Image = &discordgo.MessageEmbedImage{
-			URL: t.PhotoURLs[0],
-		}
-	}
-
-	return embed
 }
 
 func (t *Tweet) retweetMainEmbed() *discordgo.MessageEmbed {
@@ -79,14 +107,6 @@ func (t *Tweet) quotedMainEmbed() *discordgo.MessageEmbed {
 		},
 	}
 
-	if embed.Image == nil {
-		if len(t.QuotedStatus.PhotoURLs) != 0 {
-			embed.Image = &discordgo.MessageEmbedImage{
-				URL: t.QuotedStatus.PhotoURLs[0],
-			}
-		}
-	}
-
 	return embed
 }
 
@@ -97,15 +117,12 @@ func (t *Tweet) replyMainEmbed() *discordgo.MessageEmbed {
 }
 
 func (t *Tweet) GetPhotoEmbeds() []*discordgo.MessageEmbed {
-	embeds := make([]*discordgo.MessageEmbed, 0, len(t.PhotoURLs))
-	for _, url := range t.PhotoURLs {
-		embeds = append(embeds, &discordgo.MessageEmbed{
-			URL: t.URL(),
-			Image: &discordgo.MessageEmbedImage{
-				URL: url,
-			},
-			Color: utils.ParseHexColor(consts.ColorTwitter),
-		})
+	embeds := make([]*discordgo.MessageEmbed, 0, len(t.Photos))
+	for _, photo := range t.Photos {
+		photoEmbed := photo.GetEmbed()
+		photoEmbed.URL = t.URL()
+
+		embeds = append(embeds, photoEmbed)
 	}
 
 	return embeds
@@ -116,6 +133,15 @@ func (t *Tweet) GetTextWithEmbeds() string {
 		return t.RetweetedStatus.GetTextWithEmbeds()
 	}
 	return strings.TrimSpace(t.Text)
+}
+
+func (p *Photo) GetEmbed() *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Image: &discordgo.MessageEmbedImage{
+			URL: p.URL,
+		},
+		Color: utils.ParseHexColor(consts.ColorTwitter),
+	}
 }
 
 func (u *User) GetEmbed() *discordgo.MessageEmbedAuthor {

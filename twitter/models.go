@@ -18,7 +18,7 @@ type Tweet struct {
 	Text      string
 	Timestamp time.Time
 
-	PhotoURLs []string
+	Photos []*Photo
 
 	VideoURLs []string
 
@@ -58,7 +58,7 @@ func (t *Tweet) GetBaseID() string {
 }
 
 func (t *Tweet) HasPhotos() bool {
-	return len(t.PhotoURLs) > 0
+	return len(t.Photos) > 0
 }
 
 func (t *Tweet) HasVideos() bool {
@@ -74,6 +74,11 @@ type User struct {
 
 func (u *User) URL() string {
 	return fmt.Sprintf("https://twitter.com/%s", u.ScreenName)
+}
+
+type Photo struct {
+	URL     string
+	AltText string
 }
 
 type SpaceState string

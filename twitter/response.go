@@ -45,10 +45,11 @@ type rawMedia struct {
 }
 
 type rawPhoto struct {
-	Type   string `json:"type"`
-	URL    string `json:"url"`
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
+	Type    string `json:"type"`
+	URL     string `json:"url"`
+	Width   int    `json:"width"`
+	Height  int    `json:"height"`
+	AltText string `json:"altText"`
 }
 
 type rawVideo struct {
@@ -66,10 +67,13 @@ func (t *rawTweet) ToDTO() *Tweet {
 		return nil
 	}
 
-	photoURLs := make([]string, 0)
+	photos := make([]*Photo, 0)
 	if t.Media != nil {
 		for _, photo := range t.Media.Photos {
-			photoURLs = append(photoURLs, photo.URL)
+			photos = append(photos, &Photo{
+				URL:     photo.URL,
+				AltText: photo.AltText,
+			})
 		}
 	}
 
@@ -91,7 +95,7 @@ func (t *rawTweet) ToDTO() *Tweet {
 		Text:      t.Text,
 		Timestamp: time.Unix(int64(t.CreatedTimestamp), 0),
 
-		PhotoURLs: photoURLs,
+		Photos:    photos,
 		VideoURLs: videoURLs,
 
 		IsRetweet:       false,
