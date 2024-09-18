@@ -35,6 +35,8 @@ type Tweet struct {
 	UserMentions []*utils.Entity
 	MediaLinks   []*utils.Entity
 	URLs         []*utils.Entity
+
+	Poll *Poll
 }
 
 func (t *Tweet) URL() string {
@@ -87,6 +89,20 @@ const (
 	SpaceStateLive  SpaceState = "live"
 	SpaceStateEnded SpaceState = "ended"
 )
+
+type Poll struct {
+	EndsAt  time.Time
+	Choices []*PollChoice
+}
+
+func (p *Poll) IsEnded() bool {
+	return time.Now().After(p.EndsAt)
+}
+
+type PollChoice struct {
+	Label string
+	Count int
+}
 
 type Space struct {
 	ID    string

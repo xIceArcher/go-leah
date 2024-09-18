@@ -2,6 +2,7 @@ package twitter
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -64,6 +65,10 @@ func (t *Tweet) GetEmbeds() []*discordgo.MessageEmbed {
 	altTextField.Value = strings.TrimSpace(altTextField.Value)
 	if altTextField.Value != "" {
 		mainEmbed.Fields = append(mainEmbed.Fields, altTextField)
+	}
+
+	if t.Poll != nil {
+		mainEmbed.Fields = append(mainEmbed.Fields, t.Poll.GetEmbed())
 	}
 
 	mainEmbed.Author = t.User.GetEmbed()
@@ -191,4 +196,46 @@ func (s *Space) GetEmbed() *discordgo.MessageEmbed {
 		Color:     utils.ParseHexColor(color),
 		Footer:    twitterEmbedFooter,
 	}
+}
+
+func (p *Poll) GetEmbed() *discordgo.MessageEmbedField {
+	totalVotes := 0
+	maxChoice := 0
+	for i, choice := range p.Choices {
+		totalVotes += choice.Count
+
+		if choice.Count > p.Choices[maxChoice].Count {
+			maxChoice = i
+		}
+	}
+
+	ret := &discordgo.MessageEmbedField{
+		Name: "Poll",
+	}
+
+	for i, choice := range p.Choices {
+		proportion := float64(choice.Count) / float64(totalVotes)
+		numSquares := math.Round(proportion * 10)
+
+		if p.IsEnded() && i == maxChoice {
+			ret.Value += "**" + choice.Label + "**" + "\n"
+		} else {
+			ret.Value += choice.Label + "\n"
+		}
+
+		percentageFormatted := fmt.Sprintf("%.1f%% (%d) ", proportion*100, choice.Count)
+
+		if p.IsEnded() && i == maxChoice {
+			ret.Value += "**" + percentageFormatted + "**"
+		} else {
+			ret.Value += percentageFormatted
+		}
+
+		ret.Value += strings.Repeat(":blue_square:", int(numSquares)) + "\n\n"
+	}
+
+	ret.Value += "End time: " + utils.FormatDiscordRelativeTime(p.EndsAt)
+
+	ret.Value = strings.TrimSpace(ret.Value)
+	return ret
 }

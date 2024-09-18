@@ -29,6 +29,7 @@ type rawTweet struct {
 	ReplyingToStatus *string   `json:"replying_to_status"`
 	Quote            *rawTweet `json:"quote"`
 	Media            *rawMedia `json:"media"`
+	Poll             *rawPoll  `json:"poll"`
 }
 
 type rawAuthor struct {
@@ -62,6 +63,16 @@ type rawVideo struct {
 	Type         string  `json:"type"`
 }
 
+type rawPoll struct {
+	EndsAt  time.Time        `json:"ends_at"`
+	Choices []*rawPollChoice `json:"choices"`
+}
+
+type rawPollChoice struct {
+	Label string `json:"label"`
+	Count int    `json:"count"`
+}
+
 func (t *rawTweet) ToDTO() *Tweet {
 	if t == nil {
 		return nil
@@ -84,6 +95,20 @@ func (t *rawTweet) ToDTO() *Tweet {
 		}
 	}
 
+	var poll *Poll
+	if t.Poll != nil {
+		poll = &Poll{
+			EndsAt: t.Poll.EndsAt,
+		}
+
+		for _, choice := range t.Poll.Choices {
+			poll.Choices = append(poll.Choices, &PollChoice{
+				Label: choice.Label,
+				Count: choice.Count,
+			})
+		}
+	}
+
 	return &Tweet{
 		ID: t.ID,
 		User: &User{
@@ -103,5 +128,7 @@ func (t *rawTweet) ToDTO() *Tweet {
 
 		IsQuoted:     t.Quote != nil,
 		QuotedStatus: t.Quote.ToDTO(),
+
+		Poll: poll,
 	}
 }
