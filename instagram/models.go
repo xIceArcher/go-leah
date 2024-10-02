@@ -86,10 +86,12 @@ type RawVideo struct {
 func (p *RawPost) extractPhotoURLs() []string {
 	photoURLs := make([]string, 0)
 
-	if p.ImageVersions != nil && len(p.VideoVersions) == 0 {
-		p.CarouselMedia = append(p.CarouselMedia, &RawCarouselMedia{
-			ImageVersions: p.ImageVersions,
-		})
+	if p.ImageVersions != nil && len(p.VideoVersions) == 0 && len(p.CarouselMedia) == 0 {
+		p.CarouselMedia = []*RawCarouselMedia{
+			{
+				ImageVersions: p.ImageVersions,
+			},
+		}
 	}
 
 	for _, media := range p.CarouselMedia {
