@@ -39,7 +39,18 @@ func (m *InstagramPostMatcher) Handle(ctx context.Context, s *discord.MessageSes
 			continue
 		}
 
-		s.SendEmbeds(post.GetEmbeds())
+		embeds := post.GetEmbeds()
+		if len(embeds) > 10 {
+			// We send 8 embeds per message because Discord tiles 4 embeds into a single frame
+			// And each message can only have a maximum of 10 embeds
+			for start := 0; start < len(embeds); start += 8 {
+				end := min(start+8, len(embeds))
+				s.SendEmbeds(post.GetEmbeds()[start:end])
+			}
+		} else {
+			s.SendEmbeds(post.GetEmbeds())
+		}
+
 		s.SendVideoURLs(post.VideoURLs, shortcode)
 	}
 }
