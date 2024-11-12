@@ -3,6 +3,8 @@ package bot
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
 	"regexp"
 	"runtime/debug"
 	"time"
@@ -44,6 +46,15 @@ func New(cfg *config.Config, intents discordgo.Intent, logger *zap.SugaredLogger
 	}
 	session.Identify.Intents = intents
 	session.Client.Timeout = time.Minute
+
+	if cfg.Discord.ProxyURL != "" {
+		proxyURL, err := url.Parse(cfg.Discord.ProxyURL)
+		if err != nil {
+			return nil, err
+		}
+
+		session.Client.Transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+	}
 
 	return &Bot{
 		Session: discord.NewSession(session, logger),

@@ -68,6 +68,8 @@ type DiscordConfig struct {
 	Handlers map[string]*DiscordHandlerConfig `yaml:"handlers"`
 
 	FilterRegexes []string `yaml:"filterRegexes"`
+
+	ProxyURL string `yaml:"proxyUrl"`
 }
 
 type DiscordCogConfig struct {
