@@ -11,25 +11,25 @@ type getTweetResponse struct {
 }
 
 type rawTweet struct {
-	ID               string    `json:"id"`
-	URL              string    `json:"url"`
-	Text             string    `json:"text"`
-	CreatedAt        string    `json:"created_at"`
-	CreatedTimestamp int       `json:"created_timestamp"`
-	Author           rawAuthor `json:"author"`
-	Replies          int       `json:"replies"`
-	Retweets         int       `json:"retweets"`
-	Likes            int       `json:"likes"`
-	Views            int       `json:"views"`
-	Color            string    `json:"color"`
-	TwitterCard      string    `json:"twitter_card"`
-	Lang             string    `json:"lang"`
-	Source           string    `json:"source"`
-	ReplyingTo       *string   `json:"replying_to"`
-	ReplyingToStatus *string   `json:"replying_to_status"`
-	Quote            *rawTweet `json:"quote"`
-	Media            *rawMedia `json:"media"`
-	Poll             *rawPoll  `json:"poll"`
+	ID               string     `json:"id"`
+	URL              string     `json:"url"`
+	Text             string     `json:"text"`
+	CreatedAt        string     `json:"created_at"`
+	CreatedTimestamp int        `json:"created_timestamp"`
+	Author           rawAuthor  `json:"author"`
+	Replies          int        `json:"replies"`
+	Retweets         int        `json:"retweets"`
+	Likes            int        `json:"likes"`
+	Views            int        `json:"views"`
+	Color            string     `json:"color"`
+	TwitterCard      string     `json:"twitter_card"`
+	Lang             string     `json:"lang"`
+	Source           string     `json:"source"`
+	ReplyingTo       *string    `json:"replying_to"`
+	ReplyingToStatus *string    `json:"replying_to_status"`
+	Quote            *rawTweet  `json:"quote"`
+	Media            *rawMedias `json:"media"`
+	Poll             *rawPoll   `json:"poll"`
 }
 
 type rawAuthor struct {
@@ -40,27 +40,14 @@ type rawAuthor struct {
 	BannerURL   string `json:"banner_url"`
 }
 
-type rawMedia struct {
-	Photos []*rawPhoto `json:"photos"`
-	Videos []*rawVideo `json:"videos"`
+type rawMedias struct {
+	Medias []*rawMedia `json:"all"`
 }
 
-type rawPhoto struct {
+type rawMedia struct {
 	Type    string `json:"type"`
 	URL     string `json:"url"`
-	Width   int    `json:"width"`
-	Height  int    `json:"height"`
 	AltText string `json:"altText"`
-}
-
-type rawVideo struct {
-	URL          string  `json:"url"`
-	ThumbnailURL string  `json:"thumbnail_url"`
-	Width        int     `json:"width"`
-	Height       int     `json:"height"`
-	Duration     float64 `json:"duration"`
-	Format       string  `json:"format"`
-	Type         string  `json:"type"`
 }
 
 type rawPoll struct {
@@ -78,20 +65,15 @@ func (t *rawTweet) ToDTO() *Tweet {
 		return nil
 	}
 
-	photos := make([]*Photo, 0)
-	if t.Media != nil {
-		for _, photo := range t.Media.Photos {
-			photos = append(photos, &Photo{
-				URL:     photo.URL,
-				AltText: photo.AltText,
-			})
-		}
-	}
+	medias := make([]*Media, 0)
 
-	videoURLs := make([]string, 0)
-	if t.Media != nil && len(t.Media.Videos) > 0 {
-		for _, video := range t.Media.Videos {
-			videoURLs = append(videoURLs, video.URL)
+	if t.Media != nil {
+		for _, media := range t.Media.Medias {
+			medias = append(medias, &Media{
+				Type:    MediaType(media.Type),
+				URL:     media.URL,
+				AltText: media.AltText,
+			})
 		}
 	}
 
@@ -120,8 +102,7 @@ func (t *rawTweet) ToDTO() *Tweet {
 		Text:      t.Text,
 		Timestamp: time.Unix(int64(t.CreatedTimestamp), 0),
 
-		Photos:    photos,
-		VideoURLs: videoURLs,
+		Medias: medias,
 
 		IsRetweet:       false,
 		RetweetedStatus: nil,

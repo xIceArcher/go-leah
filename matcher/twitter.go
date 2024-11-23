@@ -51,19 +51,62 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 	// Whole embed is missing or corrupted
 	if len(existingEmbeds) == 0 || (existingEmbeds[0].Description == "" && tweet.Text != "") {
 		s.SendEmbeds(tweet.GetEmbeds())
-		for _, videoURL := range tweet.VideoURLs {
-			s.SendVideoURL(videoURL, s.Message.ID)
+		for _, video := range tweet.Videos() {
+			s.SendVideoURL(video.URL, s.Message.ID)
 		}
 		return
 	}
 
-	if (tweet.HasPhotos() && (existingEmbeds[0].Image == nil || tweet.Photos[0].AltText != "")) || len(tweet.Photos) > 1 || tweet.Poll != nil {
+	if !isDiscordEmbedCorrect(tweet, existingEmbeds) {
 		s.SendEmbeds(tweet.GetEmbeds())
 	}
 
 	if tweet.HasVideos() && existingEmbeds[0].Video == nil {
-		for _, videoURL := range tweet.VideoURLs {
-			s.SendVideoURL(videoURL, s.Message.ID)
+		for _, video := range tweet.Videos() {
+			s.SendVideoURL(video.URL, s.Message.ID)
 		}
 	}
+}
+
+func isDiscordEmbedCorrect(tweet *twitter.Tweet, existingEmbeds discord.UpdatableMessageEmbeds) bool {
+	// Discord can't embed polls
+	if tweet.Poll != nil {
+		return false
+	}
+
+	// Embed is missing
+	if len(existingEmbeds) == 0 {
+		return false
+	}
+
+	// Embed exists but text is missing
+	if existingEmbeds[0].Description == "" && tweet.Text != "" {
+		return false
+	}
+
+	// Additional checks for tweets with media
+	if len(tweet.Medias) != 0 {
+		// If the first media is a video, then Discord will wrongly embed it as a photo
+		if tweet.Medias[0].Type == twitter.MediaTypeVideo {
+			return false
+		}
+
+		// Discord can't embed more than one photo
+		if len(tweet.Photos()) > 1 {
+			return false
+		}
+
+		// Discord can't embed alt texts
+		if tweet.Photos()[0].AltText != "" {
+			return false
+		}
+
+		// At this point, the first media of this tweet is an image
+		// If the existing embed doesn't have an image, then it is wrong
+		if existingEmbeds[0].Image == nil {
+			return false
+		}
+	}
+
+	return true
 }

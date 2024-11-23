@@ -7,9 +7,11 @@ import (
 	"github.com/xIceArcher/go-leah/utils"
 )
 
+type MediaType string
+
 const (
-	MediaTypePhoto = "photo"
-	MediaTypeVideo = "video"
+	MediaTypePhoto MediaType = "photo"
+	MediaTypeVideo MediaType = "video"
 )
 
 type Tweet struct {
@@ -18,9 +20,7 @@ type Tweet struct {
 	Text      string
 	Timestamp time.Time
 
-	Photos []*Photo
-
-	VideoURLs []string
+	Medias []*Media
 
 	IsRetweet       bool
 	RetweetedStatus *Tweet
@@ -60,11 +60,35 @@ func (t *Tweet) GetBaseID() string {
 }
 
 func (t *Tweet) HasPhotos() bool {
-	return len(t.Photos) > 0
+	return len(t.Photos()) > 0
+}
+
+func (t *Tweet) Photos() []*Media {
+	ret := make([]*Media, 0)
+
+	for _, m := range t.Medias {
+		if m.Type == MediaTypePhoto {
+			ret = append(ret, m)
+		}
+	}
+
+	return ret
 }
 
 func (t *Tweet) HasVideos() bool {
-	return len(t.VideoURLs) > 0
+	return len(t.Videos()) > 0
+}
+
+func (t *Tweet) Videos() []*Media {
+	ret := make([]*Media, 0)
+
+	for _, m := range t.Medias {
+		if m.Type == MediaTypeVideo {
+			ret = append(ret, m)
+		}
+	}
+
+	return ret
 }
 
 type User struct {
@@ -78,7 +102,8 @@ func (u *User) URL() string {
 	return fmt.Sprintf("https://twitter.com/%s", u.ScreenName)
 }
 
-type Photo struct {
+type Media struct {
+	Type    MediaType
 	URL     string
 	AltText string
 }

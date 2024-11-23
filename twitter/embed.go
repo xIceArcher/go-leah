@@ -19,25 +19,25 @@ var twitterEmbedFooter = &discordgo.MessageEmbedFooter{
 
 func (t *Tweet) GetEmbeds() []*discordgo.MessageEmbed {
 	var mainEmbed *discordgo.MessageEmbed
-	var relevantPhotos []*Photo
+	var relevantPhotos []*Media
 
 	if t.IsReply {
 		mainEmbed = t.replyMainEmbed()
-		relevantPhotos = t.Photos
+		relevantPhotos = t.Photos()
 	} else if t.IsRetweet {
 		mainEmbed = t.retweetMainEmbed()
-		relevantPhotos = t.RetweetedStatus.Photos
+		relevantPhotos = t.RetweetedStatus.Photos()
 	} else if t.IsQuoted {
 		mainEmbed = t.quotedMainEmbed()
 
-		if len(t.Photos) > 0 {
-			relevantPhotos = t.Photos
-		} else if len(t.QuotedStatus.Photos) > 0 {
-			relevantPhotos = t.QuotedStatus.Photos
+		if t.HasPhotos() {
+			relevantPhotos = t.Photos()
+		} else if t.QuotedStatus.HasPhotos() {
+			relevantPhotos = t.QuotedStatus.Photos()
 		}
 	} else {
 		mainEmbed = t.standardMainEmbed()
-		relevantPhotos = t.Photos
+		relevantPhotos = t.Photos()
 	}
 
 	altTextField := &discordgo.MessageEmbedField{
@@ -122,8 +122,8 @@ func (t *Tweet) replyMainEmbed() *discordgo.MessageEmbed {
 }
 
 func (t *Tweet) GetPhotoEmbeds() []*discordgo.MessageEmbed {
-	embeds := make([]*discordgo.MessageEmbed, 0, len(t.Photos))
-	for _, photo := range t.Photos {
+	embeds := make([]*discordgo.MessageEmbed, 0, len(t.Photos()))
+	for _, photo := range t.Photos() {
 		photoEmbed := photo.GetEmbed()
 		photoEmbed.URL = t.URL()
 
@@ -140,10 +140,11 @@ func (t *Tweet) GetTextWithEmbeds() string {
 	return strings.TrimSpace(t.Text)
 }
 
-func (p *Photo) GetEmbed() *discordgo.MessageEmbed {
+func (m *Media) GetEmbed() *discordgo.MessageEmbed {
+	// Only works for photos
 	return &discordgo.MessageEmbed{
 		Image: &discordgo.MessageEmbedImage{
-			URL: p.URL,
+			URL: m.URL,
 		},
 		Color: utils.ParseHexColor(consts.ColorTwitter),
 	}
