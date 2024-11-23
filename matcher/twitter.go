@@ -48,27 +48,18 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 		return
 	}
 
-	// Whole embed is missing or corrupted
-	if len(existingEmbeds) == 0 || (existingEmbeds[0].Description == "" && tweet.Text != "") {
-		s.SendEmbeds(tweet.GetEmbeds())
-		for _, video := range tweet.Videos() {
-			s.SendVideoURL(video.URL, s.Message.ID)
-		}
-		return
-	}
-
-	if !isDiscordEmbedCorrect(tweet, existingEmbeds) {
+	if !isDiscordMainEmbedCorrect(tweet, existingEmbeds) {
 		s.SendEmbeds(tweet.GetEmbeds())
 	}
 
-	if tweet.HasVideos() && existingEmbeds[0].Video == nil {
+	if tweet.HasVideos() && (len(existingEmbeds) == 0 || existingEmbeds[0].Video == nil) {
 		for _, video := range tweet.Videos() {
 			s.SendVideoURL(video.URL, s.Message.ID)
 		}
 	}
 }
 
-func isDiscordEmbedCorrect(tweet *twitter.Tweet, existingEmbeds discord.UpdatableMessageEmbeds) bool {
+func isDiscordMainEmbedCorrect(tweet *twitter.Tweet, existingEmbeds discord.UpdatableMessageEmbeds) bool {
 	// Discord can't embed polls
 	if tweet.Poll != nil {
 		return false
