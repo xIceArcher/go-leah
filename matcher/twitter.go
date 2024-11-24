@@ -75,10 +75,22 @@ func isDiscordMainEmbedCorrect(tweet *twitter.Tweet, existingEmbeds discord.Upda
 		return false
 	}
 
-	// Additional checks for tweets with media
-	if len(tweet.Medias) != 0 {
-		// If the first media is a video, then Discord will wrongly embed it as a photo
-		if tweet.Medias[0].Type == twitter.MediaTypeVideo {
+	// Discord can't embed tweets that are too long
+	if len(tweet.Text) > len(existingEmbeds[0].Description) {
+		return false
+	}
+
+	// Discord can't embed alt texts
+	for _, media := range tweet.Medias {
+		if media.AltText != "" {
+			return false
+		}
+	}
+
+	// Additional checks for tweets with photos
+	if tweet.HasPhotos() {
+		// The embed is missing the photo(s)
+		if existingEmbeds[0].Image == nil {
 			return false
 		}
 
@@ -87,16 +99,17 @@ func isDiscordMainEmbedCorrect(tweet *twitter.Tweet, existingEmbeds discord.Upda
 			return false
 		}
 
-		// Discord can't embed alt texts
-		if tweet.Photos()[0].AltText != "" {
+		// If the first media is a video, then Discord will wrongly embed it as a photo, and will not embed the rest of the photos
+		if tweet.Medias[0].Type == twitter.MediaTypeVideo {
 			return false
 		}
 
-		// At this point, the first media of this tweet is an image
-		// If the existing embed doesn't have an image, then it is wrong
-		if existingEmbeds[0].Image == nil {
-			return false
-		}
+		// At this point, we know:
+		// (1) The existing embed has a photo
+		// (2) The tweet only has one photo (and potentially videos in some order)
+		// (3) The first media of this tweet is a photo
+		// (2) and (3) imply that the tweet's first media is the only photo
+		// Combied with (1), this means that the tweet's only photo is correctly embedded
 	}
 
 	return true
