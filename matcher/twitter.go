@@ -75,11 +75,6 @@ func isDiscordMainEmbedCorrect(tweet *twitter.Tweet, existingEmbeds discord.Upda
 		return false
 	}
 
-	// Discord can't embed tweets that are too long
-	if len(tweet.Text) > len(existingEmbeds[0].Description) {
-		return false
-	}
-
 	// Discord can't embed alt texts
 	for _, media := range tweet.Medias {
 		if media.AltText != "" {
