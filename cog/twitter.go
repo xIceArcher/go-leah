@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/xIceArcher/go-leah/cache"
 	"github.com/xIceArcher/go-leah/config"
@@ -59,7 +60,11 @@ func (c *TwitterCog) Embed(ctx context.Context, s *discord.MessageSession, args 
 	s.SendEmbeds(tweet.GetEmbeds())
 	if tweet.HasVideos() {
 		for _, video := range tweet.Videos() {
-			s.SendVideoURL(video.URL, s.Message.ID)
+			if video.Type == twitter.MediaTypeGIF && strings.HasSuffix(video.URL, ".mp4") {
+				s.SendMP4URLAsGIF(video.URL, s.Message.ID)
+			} else {
+				s.SendVideoURL(video.URL, s.Message.ID)
+			}
 		}
 	}
 }
@@ -96,7 +101,11 @@ func (c *TwitterCog) Video(ctx context.Context, s *discord.MessageSession, args 
 	}
 
 	for _, video := range tweet.Videos() {
-		s.SendVideoURL(video.URL, s.Message.ID)
+		if video.Type == twitter.MediaTypeGIF && strings.HasSuffix(video.URL, ".mp4") {
+			s.SendMP4URLAsGIF(video.URL, s.Message.ID)
+		} else {
+			s.SendVideoURL(video.URL, s.Message.ID)
+		}
 	}
 }
 
@@ -115,7 +124,11 @@ func (c *TwitterCog) Quoted(ctx context.Context, s *discord.MessageSession, args
 	s.SendEmbeds(tweet.QuotedStatus.GetEmbeds())
 	if tweet.QuotedStatus.HasVideos() {
 		for _, video := range tweet.QuotedStatus.Videos() {
-			s.SendVideoURL(video.URL, s.Message.ID)
+			if video.Type == twitter.MediaTypeGIF && strings.HasSuffix(video.URL, ".mp4") {
+				s.SendMP4URLAsGIF(video.URL, s.Message.ID)
+			} else {
+				s.SendVideoURL(video.URL, s.Message.ID)
+			}
 		}
 	}
 }

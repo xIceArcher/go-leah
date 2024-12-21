@@ -315,6 +315,58 @@ func (s *Session) sendVideoURLs(channelID string, videoURLs []string, fileNamePr
 	}
 }
 
+func (s *Session) SendMP4URLAsGIF(channelID string, videoURL string, fileName string) {
+	s.sendMP4URLAsGIF(channelID, videoURL, fileName, s.GetGuildPremiumTier(channelID))
+}
+
+func (s *Session) sendMP4URLAsGIF(channelID string, videoURL string, fileName string, tier discordgo.PremiumTier) {
+	if videoURL == "" {
+		return
+	}
+
+	hasPermissions, err := s.HasSendMessagePermissions(channelID)
+	if err != nil || !hasPermissions {
+		return
+	}
+
+	mp4File, _, err := utils.Download(videoURL, GetMessageMaxBytes(tier))
+	if err != nil {
+		// Since converting it to a GIF will make the video bigger
+		// If the video is already too big, then just send the URL
+		s.Logger.With(zap.Error(err)).Error("Failed to download MP4")
+		s.SendVideoURL(channelID, videoURL, fileName)
+		return
+	}
+
+	mp4FileBytes, err := io.ReadAll(mp4File)
+	if err != nil {
+		s.Logger.With(zap.Error(err)).Error("Failed to read MP4 before converting to GIF")
+		s.SendVideoURL(channelID, videoURL, fileName)
+		return
+	}
+
+	gifBytes, err := utils.ConvertMP4ToGIF(mp4FileBytes)
+	if err != nil {
+		s.Logger.With(zap.Error(err)).Error("Failed to convert GIF")
+		s.SendVideoURL(channelID, videoURL, fileName)
+		return
+	}
+
+	if _, err := s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+		Files: []*discordgo.File{
+			{
+				Name:        fmt.Sprintf("%s.gif", fileName),
+				ContentType: "video/mp4",
+				Reader:      bytes.NewReader(gifBytes),
+			},
+		},
+	}); err != nil {
+		s.Logger.With(zap.Error(err)).Error("Failed to send as GIF")
+		s.SendVideoURL(channelID, videoURL, fileName)
+		return
+	}
+}
+
 func (s *Session) SendBytesProgressBar(channelID string, totalBytes int64, description ...string) (*ProgressBar, error) {
 	hasPermissions, err := s.HasSendMessagePermissions(channelID)
 	if err != nil || !hasPermissions {
@@ -410,6 +462,10 @@ func (s *MessageSession) SendVideoURL(videoURL string, fileName string) {
 
 func (s *MessageSession) SendVideoURLs(videoURLs []string, fileNamePrefix string) {
 	s.Session.sendVideoURLs(s.ChannelID, videoURLs, fileNamePrefix, s.GetGuildPremiumTier())
+}
+
+func (s *MessageSession) SendMP4URLAsGIF(videoURL string, fileName string) {
+	s.Session.sendMP4URLAsGIF(s.ChannelID, videoURL, fileName, s.GetGuildPremiumTier())
 }
 
 func (s *MessageSession) SendError(errToSend error) {

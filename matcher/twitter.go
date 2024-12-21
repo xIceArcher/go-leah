@@ -2,6 +2,7 @@ package matcher
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/xIceArcher/go-leah/config"
@@ -54,7 +55,11 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 
 	if tweet.HasVideos() && (len(existingEmbeds) == 0 || existingEmbeds[0].Video == nil) {
 		for _, video := range tweet.Videos() {
-			s.SendVideoURL(video.URL, s.Message.ID)
+			if video.Type == twitter.MediaTypeGIF && strings.HasSuffix(video.URL, ".mp4") {
+				s.SendMP4URLAsGIF(video.URL, s.Message.ID)
+			} else {
+				s.SendVideoURL(video.URL, s.Message.ID)
+			}
 		}
 	}
 }
