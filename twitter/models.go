@@ -12,6 +12,7 @@ type MediaType string
 const (
 	MediaTypePhoto MediaType = "photo"
 	MediaTypeVideo MediaType = "video"
+	MediaTypeGIF   MediaType = "gif"
 )
 
 type Tweet struct {
@@ -83,7 +84,7 @@ func (t *Tweet) Videos() []*Media {
 	ret := make([]*Media, 0)
 
 	for _, m := range t.Medias {
-		if m.Type == MediaTypeVideo {
+		if m.Type == MediaTypeVideo || m.Type == MediaTypeGIF {
 			ret = append(ret, m)
 		}
 	}
