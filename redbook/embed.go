@@ -53,7 +53,7 @@ func (p *Post) GetEmbeds() (embeds []*discordgo.MessageEmbed) {
 				Image: &discordgo.MessageEmbedImage{
 					URL: photoURL,
 				},
-				Color: utils.ParseHexColor(consts.ColorInsta),
+				Color: utils.ParseHexColor(consts.ColorRedbook),
 			})
 		}
 	}
