@@ -12,6 +12,7 @@ type Config struct {
 	Instagram *InstaConfig   `yaml:"instagram"`
 	Twitch    *TwitchConfig  `yaml:"twitch"`
 	Tiktok    *TiktokConfig  `yaml:"tiktok"`
+	Redbook   *RedbookConfig `yaml:"redbook"`
 	QNAP      *QNAPConfig    `yaml:"qnap"`
 
 	Discord *DiscordConfig `yaml:"discord"`
@@ -49,6 +50,10 @@ type TwitchConfig struct {
 
 type TiktokConfig struct {
 	VideoURLFormat string `yaml:"videoUrlFormat"`
+}
+
+type RedbookConfig struct {
+	PostURL string `yaml:"postUrl"`
 }
 
 type QNAPConfig struct {

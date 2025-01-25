@@ -11,6 +11,7 @@ const (
 	ColorTwitter = "1DA1F2"
 	ColorTwitch  = "6441A4"
 	ColorTiktok  = "00F2EA"
+	ColorRedbook = "FF2842"
 )
 
 const (

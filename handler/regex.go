@@ -44,6 +44,7 @@ func NewRegexHandler(cfg *config.Config, s *discord.Session) (MessageHandler, er
 		"twitchLiveStream":  matcher.NewTwitchLiveStreamMatcher,
 		"twitterPost":       matcher.NewTwitterPostMatcher,
 		"tiktokVideo":       matcher.NewTiktokVideoMatcher,
+		"redbookPost":       matcher.NewRedbookPostMatcher,
 	}
 
 	matchersWithRegexes := make([]*MatcherWithRegexes, 0, len(implementedMatchers))
