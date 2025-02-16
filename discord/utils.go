@@ -22,7 +22,7 @@ func GetMessageMaxBytes(boostTier discordgo.PremiumTier) int64 {
 	case discordgo.PremiumTier2:
 		availableBytes = 50 * megaByte
 	default:
-		availableBytes = 25 * megaByte
+		availableBytes = 10 * megaByte
 	}
 
 	return int64(availableBytes - slackBytes)
