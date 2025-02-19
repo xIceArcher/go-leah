@@ -2,6 +2,9 @@ package matcher
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/xIceArcher/go-leah/config"
@@ -108,5 +111,67 @@ func (m *InstagramStoryMatcher) Handle(ctx context.Context, s *discord.MessageSe
 		if story.IsVideo() {
 			s.SendVideoURL(story.MediaURL, username)
 		}
+	}
+}
+
+type InstagramShareLinkMatcher struct {
+	GenericMatcher
+
+	postRegexes []*regexp.Regexp
+	postMatcher Matcher
+}
+
+func NewInstagramShareLinkMatcher(cfg *config.Config, s *discord.Session) (Matcher, error) {
+	postMatcher, err := NewInstagramPostMatcher(cfg, s)
+	if err != nil {
+		return nil, err
+	}
+
+	postHandlerConfig, ok := cfg.Discord.Handlers["instagramPost"]
+	if !ok {
+		return nil, fmt.Errorf("instagramPost handler config not found")
+	}
+
+	postRegexes := make([]*regexp.Regexp, 0, len(postHandlerConfig.Regexes))
+
+	for _, regexStr := range postHandlerConfig.Regexes {
+		regex, err := regexp.Compile(regexStr)
+		if err != nil {
+			return nil, err
+		}
+
+		postRegexes = append(postRegexes, regex)
+	}
+
+	return &InstagramShareLinkMatcher{
+		postRegexes: postRegexes,
+		postMatcher: postMatcher,
+	}, nil
+}
+
+func (m *InstagramShareLinkMatcher) Handle(ctx context.Context, s *discord.MessageSession, matches []string) {
+	for _, match := range matches {
+		resp, err := http.Get(match)
+		if err != nil {
+			continue
+		}
+
+		url := resp.Request.URL.String()
+
+		postMatches := make([]string, 0)
+		for _, regex := range m.postRegexes {
+			currMatches := regex.FindAllStringSubmatch(url, -1)
+			for _, match := range currMatches {
+				if len(match) > 1 {
+					// match[1] is the subgroup
+					postMatches = append(postMatches, match[1])
+				} else {
+					// match[0] is the complete match
+					postMatches = append(postMatches, match[0])
+				}
+			}
+		}
+
+		m.postMatcher.Handle(ctx, s, postMatches)
 	}
 }

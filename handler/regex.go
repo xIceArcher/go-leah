@@ -38,13 +38,14 @@ func NewRegexHandler(cfg *config.Config, s *discord.Session) (MessageHandler, er
 	}
 
 	implementedMatchers := map[string]matcher.Constructor{
-		"youtubeLiveStream": matcher.NewYoutubeLiveStreamMatcher,
-		"instagramPost":     matcher.NewInstagramPostMatcher,
-		"instagramStory":    matcher.NewInstagramStoryMatcher,
-		"twitchLiveStream":  matcher.NewTwitchLiveStreamMatcher,
-		"twitterPost":       matcher.NewTwitterPostMatcher,
-		"tiktokVideo":       matcher.NewTiktokVideoMatcher,
-		"redbookPost":       matcher.NewRedbookPostMatcher,
+		"youtubeLiveStream":  matcher.NewYoutubeLiveStreamMatcher,
+		"instagramPost":      matcher.NewInstagramPostMatcher,
+		"instagramStory":     matcher.NewInstagramStoryMatcher,
+		"instagramShareLink": matcher.NewInstagramShareLinkMatcher,
+		"twitchLiveStream":   matcher.NewTwitchLiveStreamMatcher,
+		"twitterPost":        matcher.NewTwitterPostMatcher,
+		"tiktokVideo":        matcher.NewTiktokVideoMatcher,
+		"redbookPost":        matcher.NewRedbookPostMatcher,
 	}
 
 	matchersWithRegexes := make([]*MatcherWithRegexes, 0, len(implementedMatchers))
