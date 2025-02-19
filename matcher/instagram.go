@@ -151,7 +151,7 @@ func NewInstagramShareLinkMatcher(cfg *config.Config, s *discord.Session) (Match
 
 func (m *InstagramShareLinkMatcher) Handle(ctx context.Context, s *discord.MessageSession, matches []string) {
 	for _, match := range matches {
-		resp, err := http.Get(match)
+		resp, err := http.Head(match)
 		if err != nil {
 			continue
 		}
