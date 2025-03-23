@@ -9,13 +9,12 @@ import (
 	"time"
 
 	"github.com/anaskhan96/soup"
-	"github.com/xIceArcher/go-leah/config"
 	"go.uber.org/zap"
 )
 
 type API struct{}
 
-func NewAPI(cfg *config.TiktokConfig) (*API, error) {
+func NewAPI() (*API, error) {
 	return &API{}, nil
 }
 

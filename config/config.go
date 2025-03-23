@@ -7,11 +7,9 @@ import (
 )
 
 type Config struct {
-	Twitter   *TwitterConfig `yaml:"twitter"`
 	Google    *GoogleConfig  `yaml:"google"`
 	Instagram *InstaConfig   `yaml:"instagram"`
 	Twitch    *TwitchConfig  `yaml:"twitch"`
-	Tiktok    *TiktokConfig  `yaml:"tiktok"`
 	Redbook   *RedbookConfig `yaml:"redbook"`
 	QNAP      *QNAPConfig    `yaml:"qnap"`
 
@@ -19,18 +17,6 @@ type Config struct {
 
 	Redis  *RedisConfig `yaml:"redis"`
 	Logger *LogConfig   `yaml:"logger"`
-}
-
-type TwitterConfig struct {
-	ConsumerKey    string `yaml:"consumerKey"`
-	ConsumerSecret string `yaml:"consumerSecret"`
-	AccessToken    string `yaml:"accessToken"`
-	AccessSecret   string `yaml:"accessSecret"`
-
-	PollIntervalMins        int      `yaml:"pollIntervalMins"`
-	StalkerTimeoutMins      int      `yaml:"stalkerTimeoutMins"`
-	MaxStreamRestartRetries int      `yaml:"maxStreamRestartRetries"`
-	ExpandIgnoreRegexes     []string `yaml:"expandIgnoreRegexes"`
 }
 
 type GoogleConfig struct {
@@ -46,10 +32,6 @@ type InstaConfig struct {
 type TwitchConfig struct {
 	ClientID     string `yaml:"clientID"`
 	ClientSecret string `yaml:"clientSecret"`
-}
-
-type TiktokConfig struct {
-	VideoURLFormat string `yaml:"videoUrlFormat"`
 }
 
 type RedbookConfig struct {

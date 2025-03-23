@@ -13,7 +13,6 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/xIceArcher/go-leah/cache"
-	"github.com/xIceArcher/go-leah/config"
 	"go.uber.org/zap"
 )
 
@@ -36,8 +35,8 @@ type CachedAPI struct {
 	logger *zap.SugaredLogger
 }
 
-func NewCachedAPI(cfg *config.TwitterConfig, c cache.Cache, logger *zap.SugaredLogger) API {
-	_ = NewBaseAPI(cfg)
+func NewCachedAPI(c cache.Cache, logger *zap.SugaredLogger) API {
+	_ = NewBaseAPI()
 
 	return &CachedAPI{
 		BaseAPI: &BaseAPI{},
@@ -96,7 +95,7 @@ var (
 	apiSetupOnce sync.Once
 )
 
-func NewBaseAPI(cfg *config.TwitterConfig) *BaseAPI {
+func NewBaseAPI() *BaseAPI {
 	apiSetupOnce.Do(func() {
 		client = retryablehttp.NewClient()
 		client.HTTPClient.Timeout = 30 * time.Second

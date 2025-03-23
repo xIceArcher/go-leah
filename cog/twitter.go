@@ -38,7 +38,7 @@ func NewTwitterCog(cfg *config.Config, s *discord.Session) (Cog, error) {
 		return nil, err
 	}
 
-	c.api = twitter.NewCachedAPI(cfg.Twitter, cache, zap.S())
+	c.api = twitter.NewCachedAPI(cache, zap.S())
 
 	c.allCommands = map[string]CommandFunc{
 		"embed":  c.Embed,

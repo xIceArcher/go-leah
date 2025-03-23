@@ -21,7 +21,7 @@ type TiktokVideoMatcher struct {
 }
 
 func NewTiktokVideoMatcher(cfg *config.Config, s *discord.Session) (Matcher, error) {
-	api, err := tiktok.NewAPI(cfg.Tiktok)
+	api, err := tiktok.NewAPI()
 	if err != nil {
 		return nil, err
 	}

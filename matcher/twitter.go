@@ -19,7 +19,7 @@ type TwitterPostMatcher struct {
 
 func NewTwitterPostMatcher(cfg *config.Config, s *discord.Session) (Matcher, error) {
 	return &TwitterPostMatcher{
-		api: twitter.NewBaseAPI(cfg.Twitter),
+		api: twitter.NewBaseAPI(),
 	}, nil
 }
 
