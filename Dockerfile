@@ -14,6 +14,7 @@ FROM debian:stable-slim
 RUN apt update
 RUN apt install -y --no-install-recommends ca-certificates
 RUN update-ca-certificates
+RUN apt install -y ffmpeg
 COPY --from=build /bin/leah /bin/leah
 COPY --from=download-yt-dlp /bin/yt-dlp /bin/yt-dlp  
 CMD ["/bin/leah"]
