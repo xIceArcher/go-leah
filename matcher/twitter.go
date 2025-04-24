@@ -2,6 +2,7 @@ package matcher
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"time"
 
@@ -98,6 +99,17 @@ func isDiscordMainEmbedCorrect(tweet *twitter.Tweet, existingEmbeds discord.Upda
 	if tweet.HasPhotos() {
 		// The embed is missing the photo(s)
 		if existingEmbeds[0].Image == nil {
+			return false
+		}
+
+		// The photo URL is not OK
+		resp, err := http.Get(existingEmbeds[0].Image.URL)
+		if err != nil {
+			return false
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return false
 		}
 
