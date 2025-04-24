@@ -101,7 +101,7 @@ func (s *Session) SendEmbed(channelID string, embed *discordgo.MessageEmbed) (*U
 		return nil, ErrMissingPermissions
 	}
 
-	m, err := s.ChannelMessageSendEmbed(channelID, embed)
+	m, err := s.ChannelMessageSendEmbed(channelID, processEmbed(embed))
 	if err != nil {
 		s.Logger.With(zap.Error(err)).Error("Failed to send embeds")
 		return nil, err
@@ -139,7 +139,7 @@ func (s *Session) downloadImageAndSendEmbed(channelID string, embed *discordgo.M
 	embed.Image.URL = fmt.Sprintf("attachment://%s.jpg", fileName)
 
 	message := &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{embed},
+		Embeds: []*discordgo.MessageEmbed{processEmbed(embed)},
 		Files: []*discordgo.File{
 			{
 				Name:        fmt.Sprintf("%s.jpg", fileName),
@@ -171,7 +171,7 @@ func (s *Session) SendEmbeds(channelID string, embeds []*discordgo.MessageEmbed)
 		return nil, ErrMissingPermissions
 	}
 
-	m, err := s.ChannelMessageSendEmbeds(channelID, embeds)
+	m, err := s.ChannelMessageSendEmbeds(channelID, processEmbeds(embeds))
 	if err != nil {
 		s.Logger.With(zap.Error(err)).Error("Failed to send embeds")
 		return nil, err
@@ -492,4 +492,49 @@ func (s *MessageSession) GetGuildPremiumTier() discordgo.PremiumTier {
 	}
 
 	return guild.PremiumTier
+}
+
+func processEmbeds(embeds []*discordgo.MessageEmbed) []*discordgo.MessageEmbed {
+	ret := make([]*discordgo.MessageEmbed, 0)
+	for _, embed := range embeds {
+		ret = append(ret, processEmbed(embed))
+	}
+	return ret
+}
+
+func processEmbed(embed *discordgo.MessageEmbed) *discordgo.MessageEmbed {
+	embed.Title = trimStringToLength(embed.Title, 256)
+	embed.Description = trimStringToLength(embed.Description, 4096)
+
+	if len(embed.Fields) > 25 {
+		embed.Fields = embed.Fields[:25]
+	}
+
+	for _, field := range embed.Fields {
+		field.Name = trimStringToLength(field.Name, 256)
+		field.Value = trimStringToLength(field.Value, 1024)
+	}
+
+	if embed.Footer != nil {
+		embed.Footer.Text = trimStringToLength(embed.Footer.Text, 2048)
+	}
+
+	if embed.Author != nil {
+		embed.Author.Name = trimStringToLength(embed.Author.Name, 256)
+	}
+
+	return embed
+}
+
+func trimStringToLength(s string, maxChars int) string {
+	runes := []rune(s)
+
+	if len(runes) <= maxChars {
+		return s
+	}
+
+	runes = runes[:maxChars-1]
+	runes = append(runes, '…')
+	ret := string(runes)
+	return ret
 }
