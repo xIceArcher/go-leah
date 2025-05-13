@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/xIceArcher/go-leah/cache"
 	"github.com/xIceArcher/go-leah/config"
@@ -46,6 +47,8 @@ func NewTwitterCog(cfg *config.Config, s *discord.Session) (Cog, error) {
 		"video":  c.Video,
 		"quoted": c.Quoted,
 	}
+
+	go twitter.StalkList(context.Background(), cfg, s, "1335888187947483147", "1921767698423521764", 15*time.Second)
 
 	return c, nil
 }

@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	Google    *GoogleConfig  `yaml:"google"`
+	Twitter   *TwitterConfig `yaml:"twitter"`
 	Instagram *InstaConfig   `yaml:"instagram"`
 	Twitch    *TwitchConfig  `yaml:"twitch"`
 	Redbook   *RedbookConfig `yaml:"redbook"`
@@ -20,6 +21,10 @@ type Config struct {
 }
 
 type GoogleConfig struct {
+	APIKey string `yaml:"apiKey"`
+}
+
+type TwitterConfig struct {
 	APIKey string `yaml:"apiKey"`
 }
 
