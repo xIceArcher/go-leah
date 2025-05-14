@@ -15,6 +15,7 @@ var (
 
 type Cog interface {
 	Handle(context.Context, *discord.MessageSession, string, []string)
+	Start(*discord.Session) error
 	HasCommand(string) bool
 	Commands() []string
 	Stop()
@@ -33,6 +34,8 @@ func (c *GenericCog) Handle(ctx context.Context, s *discord.MessageSession, cmd 
 		commandFunc(ctx, s, args)
 	}
 }
+
+func (c *GenericCog) Start(s *discord.Session) error { return nil }
 
 func (c *GenericCog) HasCommand(cmd string) bool {
 	_, ok := c.allCommands[cmd]

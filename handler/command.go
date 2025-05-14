@@ -31,19 +31,16 @@ type CogWithConfig struct {
 
 func NewCommandHandler(cfg *config.Config, s *discord.Session) (MessageHandler, error) {
 	implementedCogs := map[string]cog.Constructor{
-		"admin":    cog.NewAdminCog,
-		"twitter":  cog.NewTwitterCog,
-		"download": cog.NewDownloadCog,
+		"admin":      cog.NewAdminCog,
+		"twitter":    cog.NewTwitterCog,
+		"download":   cog.NewDownloadCog,
+		"tweetstalk": cog.NewTweetstalkCog,
 	}
 
 	activeCommands := make(map[string]struct{})
 
 	cogsWithConfig := make([]*CogWithConfig, 0, len(implementedCogs))
 	for cogName, cogCfg := range cfg.Discord.Cogs {
-		if len(cogCfg.Commands) == 0 {
-			continue
-		}
-
 		cogConstructor, ok := implementedCogs[cogName]
 		if !ok {
 			return nil, fmt.Errorf("cog %s not found", cogName)
@@ -68,6 +65,10 @@ func NewCommandHandler(cfg *config.Config, s *discord.Session) (MessageHandler, 
 				return nil, fmt.Errorf("duplicate command %s", command)
 			}
 			activeCommands[command] = struct{}{}
+		}
+
+		if err := c.Start(s); err != nil {
+			return nil, fmt.Errorf("failed to start cog %s", cogName)
 		}
 
 		cogsWithConfig = append(cogsWithConfig, &CogWithConfig{

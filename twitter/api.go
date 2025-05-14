@@ -8,11 +8,14 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"sync"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/xIceArcher/go-leah/cache"
+	"github.com/xIceArcher/go-leah/config"
 	"go.uber.org/zap"
 )
 
@@ -26,6 +29,7 @@ var ErrInternalServerError = errors.New("internal server error")
 
 type API interface {
 	GetTweet(id string) (*Tweet, error)
+	ListTweetsFromList(listID string, since time.Time) ([]*Tweet, error)
 }
 
 type CachedAPI struct {
@@ -35,8 +39,8 @@ type CachedAPI struct {
 	logger *zap.SugaredLogger
 }
 
-func NewCachedAPI(c cache.Cache, logger *zap.SugaredLogger) API {
-	_ = NewBaseAPI()
+func NewCachedAPI(conf *config.TwitterConfig, c cache.Cache, logger *zap.SugaredLogger) API {
+	_ = NewBaseAPI(conf)
 
 	return &CachedAPI{
 		BaseAPI: &BaseAPI{},
@@ -90,12 +94,13 @@ func (a *CachedAPI) GetTweet(id string) (*Tweet, error) {
 type BaseAPI struct{}
 
 var (
-	client *retryablehttp.Client
+	client      *retryablehttp.Client
+	restyClient *resty.Client
 
 	apiSetupOnce sync.Once
 )
 
-func NewBaseAPI() *BaseAPI {
+func NewBaseAPI(conf *config.TwitterConfig) *BaseAPI {
 	apiSetupOnce.Do(func() {
 		client = retryablehttp.NewClient()
 		client.HTTPClient.Timeout = 30 * time.Second
@@ -108,6 +113,8 @@ func NewBaseAPI() *BaseAPI {
 			return retryablehttp.DefaultRetryPolicy(ctx, resp, err)
 		}
 		client.Logger = nil
+
+		restyClient = resty.New().SetHeader("X-API-Key", conf.APIKey)
 	})
 
 	return &BaseAPI{}
@@ -141,4 +148,49 @@ func (a *BaseAPI) GetTweet(id string) (*Tweet, error) {
 	}
 
 	return rawResp.Tweet.ToDTO(), nil
+}
+
+func (a *BaseAPI) ListTweetsFromList(listID string, since time.Time) ([]*Tweet, error) {
+	logger := zap.S().With(zap.String("listID", listID)).With(zap.Time("since", since))
+
+	cursor := ""
+	ret := make([]*Tweet, 0)
+	for {
+		queryParams := map[string]string{
+			"listId":    listID,
+			"sinceTime": fmt.Sprintf("%v", since.Unix()),
+		}
+
+		if cursor != "" {
+			queryParams["cursor"] = cursor
+		}
+
+		resp := &listTweetsFromListResponse{}
+		_, err := restyClient.R().
+			SetQueryParams(queryParams).
+			SetResult(resp).
+			Get("https://api.twitterapi.io/twitter/list/tweets")
+		if err != nil {
+			return nil, err
+		}
+
+		for _, tweet := range resp.Tweets {
+			t, err := a.GetTweet(tweet.ID)
+			if err != nil {
+				logger.Error("Got error when fetching tweet")
+				continue
+			}
+
+			ret = append(ret, t)
+		}
+
+		if resp.NextCursor == "" {
+			break
+		}
+
+		cursor = resp.NextCursor
+	}
+
+	slices.Reverse(ret)
+	return ret, nil
 }

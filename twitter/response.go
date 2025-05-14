@@ -113,3 +113,10 @@ func (t *rawTweet) ToDTO() *Tweet {
 		Poll: poll,
 	}
 }
+
+type listTweetsFromListResponse struct {
+	Tweets []struct {
+		ID string `json:"id"`
+	} `json:"tweets"`
+	NextCursor string `json:"next_cursor"`
+}

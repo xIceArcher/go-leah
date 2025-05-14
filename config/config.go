@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"time"
 
 	"github.com/jinzhu/configor"
 )
@@ -26,6 +27,13 @@ type GoogleConfig struct {
 
 type TwitterConfig struct {
 	APIKey string `yaml:"apiKey"`
+
+	StalkListID          string `yaml:"stalkListID"`
+	StalkIntervalMinutes int    `yaml:"stalkIntervalMinutes"`
+}
+
+func (c *TwitterConfig) StalkInterval() time.Duration {
+	return time.Duration(c.StalkIntervalMinutes) * time.Minute
 }
 
 type InstaConfig struct {
