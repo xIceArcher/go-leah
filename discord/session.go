@@ -345,7 +345,7 @@ func (s *Session) sendMP4URLAsGIF(channelID string, videoURL string, fileName st
 		return
 	}
 
-	gifBytes, err := utils.ConvertMP4ToGIF(mp4FileBytes)
+	gifBytes, err := utils.ConvertMP4ToGIF(mp4FileBytes, GetMessageMaxBytes(tier))
 	if err != nil {
 		s.Logger.With(zap.Error(err)).Error("Failed to convert GIF")
 		s.SendVideoURL(channelID, videoURL, fileName)
