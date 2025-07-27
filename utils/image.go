@@ -21,7 +21,7 @@ func ConvertMP4ToGIF(video []byte, maxBytesInt64 int64) ([]byte, error) {
 
 	losslessGIF, err := ConvertMP4ToGIFLossless(video)
 	if err == nil && len(losslessGIF) <= maxBytes {
-		zap.S().Info("Sent compressed GIF")
+		zap.S().Info("Sent lossless GIF")
 		return losslessGIF, nil
 	}
 
