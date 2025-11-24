@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/xIceArcher/go-leah/config"
 )
 
@@ -18,12 +19,13 @@ type API struct {
 }
 
 func NewAPI(cfg *config.RedbookConfig) (*API, error) {
+	client := retryablehttp.NewClient().StandardClient()
+	client.Timeout = 30 * time.Second
+
 	return &API{
 		url: cfg.PostURL,
 
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		client: client,
 	}, nil
 }
 

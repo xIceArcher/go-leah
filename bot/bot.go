@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/xIceArcher/go-leah/config"
 	"github.com/xIceArcher/go-leah/discord"
 	"github.com/xIceArcher/go-leah/handler"
@@ -45,6 +46,7 @@ func New(cfg *config.Config, intents discordgo.Intent, logger *zap.SugaredLogger
 		return nil, err
 	}
 	session.Identify.Intents = intents
+	session.Client = retryablehttp.NewClient().StandardClient()
 	session.Client.Timeout = time.Minute
 
 	if cfg.Discord.ProxyURL != "" {

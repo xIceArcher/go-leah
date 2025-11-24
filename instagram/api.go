@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/xIceArcher/go-leah/config"
 )
 
@@ -28,9 +29,8 @@ func NewAPI(cfg *config.InstaConfig) (*API, error) {
 		instaPostURLFormat = cfg.PostURLFormat
 		instaStoryURLFormat = cfg.StoryURLFormat
 		instaUserURLFormat = cfg.UserURLFormat
-		client = &http.Client{
-			Timeout: 30 * time.Second,
-		}
+		client = retryablehttp.NewClient().StandardClient()
+		client.Timeout = 30 * time.Second
 	})
 
 	return &API{}, nil
