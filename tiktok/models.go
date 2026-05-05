@@ -85,21 +85,11 @@ func (fs *RawFormats) SortByQuality() {
 }
 
 type RawUser struct {
-	DefaultScope struct {
-		WebappUserDetail struct {
-			UserInfo struct {
-				User struct {
-					ID           string `json:"id"`
-					ShortID      string `json:"shortId"`
-					UniqueID     string `json:"uniqueId"`
-					Nickname     string `json:"nickname"`
-					AvatarLarger string `json:"avatarLarger"`
-					AvatarMedium string `json:"avatarMedium"`
-					AvatarThumb  string `json:"avatarThumb"`
-				} `json:"user"`
-			} `json:"userInfo"`
-		} `json:"webapp.user-detail"`
-	} `json:"__DEFAULT_SCOPE__"`
+	ID         string `json:"id"`
+	Channel    string `json:"channel"`
+	ChannelID  string `json:"channel_id"`
+	Uploader   string `json:"uploader"`
+	UploaderID string `json:"uploader_id"`
 }
 
 type Video struct {
