@@ -29,6 +29,21 @@ func NewAPI() (*API, error) {
 }
 
 func (a *API) GetVideo(postID string) (*Video, error) {
+	var lastErr error
+	for i := 0; i < 5; i++ {
+		video, err := a.getVideo(postID)
+		if err == nil {
+			return video, nil
+		}
+
+		lastErr = fmt.Errorf("attempt %d: %w", i+1, err)
+		zap.S().With("postID", postID, "attempt", i+1).With(zap.Error(lastErr)).Warn("Failed to get video, retrying...")
+		time.Sleep(time.Duration(1<<i) * time.Second)
+	}
+	return nil, fmt.Errorf("failed to get video after 5 attempts: %w", lastErr)
+}
+
+func (a *API) getVideo(postID string) (*Video, error) {
 	logger := zap.S().With("postID", postID)
 
 	url := fmt.Sprintf("https://www.tiktok.com/@a/video/%s", postID)
