@@ -8,12 +8,14 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/xIceArcher/go-leah/cache"
 	"go.uber.org/zap"
+	"golang.org/x/net/html"
 )
 
 const (
@@ -140,5 +142,70 @@ func (a *BaseAPI) GetTweet(id string) (*Tweet, error) {
 		return nil, ErrInternalServerError
 	}
 
-	return rawResp.Tweet.ToDTO(), nil
+	tweet := rawResp.Tweet.ToDTO()
+	if !rawResp.Tweet.PossiblySensitive {
+		tweet.IsSensitive = a.isAdultRatedTweet(rawResp.Tweet)
+	}
+
+	return tweet, nil
+}
+
+func (a *BaseAPI) isAdultRatedTweet(tweet rawTweet) bool {
+	screenName := "i"
+	if tweet.Author.ScreenName != "" {
+		screenName = tweet.Author.ScreenName
+	}
+
+	req, err := retryablehttp.NewRequest(http.MethodGet, fmt.Sprintf("https://fxtwitter.com/%s/status/%s", screenName, tweet.ID), nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return false
+	}
+
+	return isAdultRatedHTML(resp.Body)
+}
+
+func isAdultRatedHTML(reader io.Reader) bool {
+	document, err := html.Parse(reader)
+	if err != nil {
+		return false
+	}
+
+	var findMeta func(*html.Node) bool
+	findMeta = func(node *html.Node) bool {
+		if node.Type == html.ElementNode && strings.EqualFold(node.Data, "meta") {
+			var name string
+			var content string
+			for _, attribute := range node.Attr {
+				switch {
+				case strings.EqualFold(attribute.Key, "name"):
+					name = attribute.Val
+				case strings.EqualFold(attribute.Key, "content"):
+					content = attribute.Val
+				}
+			}
+			if strings.EqualFold(name, "rating") && strings.EqualFold(strings.TrimSpace(content), "adult") {
+				return true
+			}
+		}
+
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			if findMeta(child) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return findMeta(document)
 }

@@ -11,25 +11,26 @@ type getTweetResponse struct {
 }
 
 type rawTweet struct {
-	ID               string     `json:"id"`
-	URL              string     `json:"url"`
-	Text             string     `json:"text"`
-	CreatedAt        string     `json:"created_at"`
-	CreatedTimestamp int        `json:"created_timestamp"`
-	Author           rawAuthor  `json:"author"`
-	Replies          int        `json:"replies"`
-	Retweets         int        `json:"retweets"`
-	Likes            int        `json:"likes"`
-	Views            int        `json:"views"`
-	Color            string     `json:"color"`
-	TwitterCard      string     `json:"twitter_card"`
-	Lang             string     `json:"lang"`
-	Source           string     `json:"source"`
-	ReplyingTo       *string    `json:"replying_to"`
-	ReplyingToStatus *string    `json:"replying_to_status"`
-	Quote            *rawTweet  `json:"quote"`
-	Media            *rawMedias `json:"media"`
-	Poll             *rawPoll   `json:"poll"`
+	ID                string     `json:"id"`
+	URL               string     `json:"url"`
+	Text              string     `json:"text"`
+	CreatedAt         string     `json:"created_at"`
+	CreatedTimestamp  int        `json:"created_timestamp"`
+	Author            rawAuthor  `json:"author"`
+	Replies           int        `json:"replies"`
+	Retweets          int        `json:"retweets"`
+	Likes             int        `json:"likes"`
+	Views             int        `json:"views"`
+	PossiblySensitive bool       `json:"possibly_sensitive"`
+	Color             string     `json:"color"`
+	TwitterCard       string     `json:"twitter_card"`
+	Lang              string     `json:"lang"`
+	Source            string     `json:"source"`
+	ReplyingTo        *string    `json:"replying_to"`
+	ReplyingToStatus  *string    `json:"replying_to_status"`
+	Quote             *rawTweet  `json:"quote"`
+	Media             *rawMedias `json:"media"`
+	Poll              *rawPoll   `json:"poll"`
 }
 
 type rawAuthor struct {
@@ -99,8 +100,9 @@ func (t *rawTweet) ToDTO() *Tweet {
 			ScreenName:      t.Author.ScreenName,
 			ProfileImageURL: t.Author.AvatarURL,
 		},
-		Text:      t.Text,
-		Timestamp: time.Unix(int64(t.CreatedTimestamp), 0),
+		Text:        t.Text,
+		Timestamp:   time.Unix(int64(t.CreatedTimestamp), 0),
+		IsSensitive: t.PossiblySensitive,
 
 		Medias: medias,
 

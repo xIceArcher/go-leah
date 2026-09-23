@@ -16,10 +16,11 @@ const (
 )
 
 type Tweet struct {
-	ID        string
-	User      *User
-	Text      string
-	Timestamp time.Time
+	ID          string
+	User        *User
+	Text        string
+	Timestamp   time.Time
+	IsSensitive bool
 
 	Medias []*Media
 

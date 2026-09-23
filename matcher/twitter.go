@@ -129,6 +129,11 @@ func isDiscordMainEmbedCorrect(tweet *twitter.Tweet, existingEmbeds discord.Upda
 }
 
 func isDiscordMainEmbedPossiblyCorrect(tweet *twitter.Tweet) bool {
+	// Discord doesn't embed what it thinks is adult content
+	if tweet.IsSensitive {
+		return false
+	}
+
 	// Discord can't embed polls
 	if tweet.Poll != nil {
 		return false
