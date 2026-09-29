@@ -2,12 +2,15 @@ package discord
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/xIceArcher/go-leah/utils"
 	"go.uber.org/zap"
 )
@@ -171,13 +174,90 @@ func (s *Session) SendEmbeds(channelID string, embeds []*discordgo.MessageEmbed)
 		return nil, ErrMissingPermissions
 	}
 
-	m, err := s.ChannelMessageSendEmbeds(channelID, processEmbeds(embeds))
+	processedEmbeds := processEmbeds(embeds)
+	m, err := s.ChannelMessageSendEmbeds(channelID, processedEmbeds)
 	if err != nil {
 		s.Logger.With(zap.Error(err)).Error("Failed to send embeds")
 		return nil, err
 	}
 
+	if hasImageEmbeds(processedEmbeds) {
+		m = s.refreshUnresolvedImageEmbeds(channelID, m, processedEmbeds)
+	}
+
 	return NewUpdatableMessageEmbeds(s, m), nil
+}
+
+func (s *Session) refreshUnresolvedImageEmbeds(channelID string, message *discordgo.Message, embeds []*discordgo.MessageEmbed) *discordgo.Message {
+	refreshes := 0
+	backOff := backoff.NewExponentialBackOff()
+	backOff.InitialInterval = 1 * time.Second
+	backOff.Multiplier = 2
+	backOff.MaxInterval = 16 * time.Second
+
+	refreshedMessage, err := backoff.Retry(
+		context.Background(),
+		func() (*discordgo.Message, error) {
+			fetchedMessage, err := s.ChannelMessage(channelID, message.ID)
+			if err != nil {
+				return message, err
+			}
+			message = fetchedMessage
+			if !hasUnresolvedImageEmbeds(message.Embeds) {
+				if refreshes > 0 {
+					s.Logger.With(
+						zap.String("channelID", channelID),
+						zap.String("messageID", message.ID),
+						zap.Int("refreshes", refreshes),
+					).Info("Recovered unresolved image embeds")
+				}
+				return message, nil
+			}
+
+			message, err = s.ChannelMessageEditEmbeds(channelID, message.ID, embeds)
+			if err != nil {
+				return message, err
+			}
+			refreshes++
+
+			return message, fmt.Errorf("image embeds remain unresolved")
+		},
+		backoff.WithBackOff(backOff),
+		backoff.WithMaxTries(5),
+		backoff.WithNotify(func(err error, next time.Duration) {
+			s.Logger.With(zap.Error(err), zap.Duration("retryIn", next)).Warn("Refreshing unresolved image embeds")
+		}),
+	)
+	if err != nil {
+		s.Logger.With(zap.Error(err)).Warn("Image embeds remain unresolved after refresh retries")
+	}
+	if refreshedMessage != nil {
+		return refreshedMessage
+	}
+
+	return message
+}
+
+func hasImageEmbeds(embeds []*discordgo.MessageEmbed) bool {
+	for _, embed := range embeds {
+		if embed != nil && embed.Image != nil && embed.Image.URL != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUnresolvedImageEmbeds(embeds []*discordgo.MessageEmbed) bool {
+	for _, embed := range embeds {
+		if embed == nil || embed.Image == nil || embed.Image.URL == "" {
+			continue
+		}
+
+		if embed.Image.Width <= 0 || embed.Image.Height <= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Session) SendVideo(channelID string, video io.ReadCloser, fileName string) {

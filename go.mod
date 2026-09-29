@@ -1,9 +1,10 @@
 module github.com/xIceArcher/go-leah
 
-go 1.21
+go 1.23
 
 require (
 	github.com/bwmarrin/discordgo v0.24.0
+	github.com/cenkalti/backoff/v7 v7.0.0
 	github.com/docker/go-units v0.4.0
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/go-resty/resty/v2 v2.6.0
@@ -21,6 +22,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.19.1
 	golang.org/x/exp v0.0.0-20220317015231-48e79f11773a
+	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 	google.golang.org/api v0.60.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
@@ -45,7 +47,6 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
-	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
 	golang.org/x/oauth2 v0.0.0-20211028175245-ba495a64dcb5 // indirect
 	golang.org/x/sys v0.0.0-20220412071739-889880a91fd5 // indirect
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171 // indirect
