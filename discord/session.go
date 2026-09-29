@@ -193,7 +193,7 @@ func (s *Session) refreshUnresolvedImageEmbeds(channelID string, message *discor
 	backOff := backoff.NewExponentialBackOff()
 	backOff.InitialInterval = 1 * time.Second
 	backOff.Multiplier = 2
-	backOff.MaxInterval = 16 * time.Second
+	backOff.MaxInterval = 64 * time.Second
 
 	refreshedMessage, err := backoff.Retry(
 		context.Background(),
