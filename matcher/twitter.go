@@ -3,6 +3,7 @@ package matcher
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,21 +26,30 @@ func NewTwitterPostMatcher(cfg *config.Config, s *discord.Session) (Matcher, err
 }
 
 func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSession, matches []string) {
-	tweetID := matches[0]
+	tweets := make([]*twitter.Tweet, 0, len(matches))
+	for _, tweetID := range matches {
+		logger := s.Logger.With(zap.String("tweetID", tweetID))
 
-	logger := s.Logger.With(
-		zap.String("tweetID", tweetID),
-	)
+		tweet, err := m.api.GetTweet(tweetID)
+		if err != nil {
+			logger.With(zap.Error(err)).Info("Failed to get tweet ID")
+			continue
+		}
 
-	tweet, err := m.api.GetTweet(tweetID)
-	if err != nil {
-		logger.With(zap.Error(err)).Info("Failed to get tweet ID")
+		tweets = append(tweets, tweet)
+	}
+
+	if len(tweets) == 0 {
 		return
 	}
 
-	m.handleTweetMainEmbed(ctx, s, matches, tweet)
+	m.handleTweetMainEmbeds(ctx, s, tweets)
 
-	if tweet.HasVideos() {
+	for _, tweet := range tweets {
+		if !tweet.HasVideos() {
+			continue
+		}
+
 		for _, video := range tweet.Videos() {
 			if video.Type == twitter.MediaTypeGIF && strings.HasSuffix(video.URL, ".mp4") {
 				s.SendMP4URLAsGIF(video.URL, s.Message.ID)
@@ -50,34 +60,41 @@ func (m *TwitterPostMatcher) Handle(ctx context.Context, s *discord.MessageSessi
 	}
 }
 
-func (m *TwitterPostMatcher) handleTweetMainEmbed(_ context.Context, s *discord.MessageSession, matches []string, tweet *twitter.Tweet) {
+func (m *TwitterPostMatcher) handleTweetMainEmbeds(_ context.Context, s *discord.MessageSession, tweets []*twitter.Tweet) {
 	var existingEmbeds discord.UpdatableMessageEmbeds
-	var err error
-
-	if isDiscordMainEmbedPossiblyCorrect(tweet) {
-		s.Logger.With(
-			zap.String("tweetID", tweet.ID),
-		).Info("Tweet is possibly embeddable, waiting...")
-
+	if slices.ContainsFunc(tweets, isDiscordMainEmbedPossiblyCorrect) {
+		s.Logger.Info("Tweets are possibly embeddable, waiting...")
 		time.Sleep(3 * time.Second)
 
+		var err error
 		existingEmbeds, err = s.GetMessageEmbeds()
 		if err != nil {
 			s.Logger.With(zap.Error(err)).Warn("Failed to get message embeds")
 			return
 		}
+	}
 
-		// TODO: Find some way to match tweets to existing embeds
-		if len(matches) > 1 && len(existingEmbeds) > 0 {
-			return
+	for _, tweet := range tweets {
+		if isDiscordMainEmbedPossiblyCorrect(tweet) {
+			existingEmbed := findTweetEmbed(tweet, existingEmbeds)
+			if existingEmbed != nil && isDiscordMainEmbedCorrect(tweet, discord.UpdatableMessageEmbeds{existingEmbed}) {
+				continue
+			}
 		}
 
-		if isDiscordMainEmbedCorrect(tweet, existingEmbeds) {
-			return
+		s.SendEmbeds(tweet.GetEmbeds())
+	}
+}
+
+func findTweetEmbed(tweet *twitter.Tweet, embeds discord.UpdatableMessageEmbeds) *discord.UpdatableMessageEmbed {
+	for _, embed := range embeds {
+		matches := twitter.URLRegex.FindStringSubmatch(embed.URL)
+		if len(matches) > 1 && matches[1] == tweet.ID {
+			return embed
 		}
 	}
 
-	s.SendEmbeds(tweet.GetEmbeds())
+	return nil
 }
 
 func isDiscordMainEmbedCorrect(tweet *twitter.Tweet, existingEmbeds discord.UpdatableMessageEmbeds) bool {
